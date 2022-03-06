@@ -1,0 +1,5 @@
+numpy
+numba
+pyelastica
+matplotlib
+tqdm
