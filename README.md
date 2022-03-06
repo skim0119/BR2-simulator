@@ -1,4 +1,4 @@
-<div align="center"> BR2 Simulator </div>
+<div align="center"><h1> BR2 Simulator </h1></div>
 
 ----
 
