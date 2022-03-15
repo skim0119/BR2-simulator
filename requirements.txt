@@ -1,5 +1,5 @@
 numpy
 numba
-pyelastica
+pyelastica>=0.2.2.post1
 matplotlib
 tqdm
