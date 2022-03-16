@@ -1,34 +1,39 @@
+import os
+import copy
+import numpy as np
+from itertools import combinations
+import json
+
+from elastica import *
 from elastica._calculus import _isnan_check
 from elastica.timestepper import extend_stepper_interface
-from elastica import *
 from elastica.external_forces import (
     UniformTorques,
     # EndPointTorques,
 )
-import copy
 from elastica.external_forces import GravityForces
+
+
+from elastica._calculus import _clip_array
+from elastica._linalg import _batch_cross, _batch_dot, _batch_norm, _batch_matvec
+from elastica._linalg import _batch_product_i_k_to_ik
+from elastica.restart import save_state, load_state
 
 from surface_connection_parallel_rod_numba import (
     SurfaceJointSideBySide,
     TipToTipStraightJoint
 )
 
-from elastica._calculus import _clip_array
-from elastica._linalg import _batch_cross, _batch_dot, _batch_norm, _batch_matvec
-from elastica._elastica_numba._linalg import _batch_product_i_k_to_ik
-
 from free_custom_systems import (
-    FreeBendActuation, FreeTwistActuation,
+    FreeBendActuation,
+    FreeTwistActuation,
     FreeBaseEndSoftFixed
 )
-import numpy as np
 
-from itertools import combinations
-import json
 
 
 # Set base elastica simulator class
-class BaseSimulator(BaseSystemCollection, Constraints, Connections, Forcing, CallBacks):
+class BR2Simulator(BaseSystemCollection, Constraints, Connections, Forcing, CallBacks):
     pass
 
 
@@ -64,7 +69,7 @@ class FreeCallback(CallBackBaseClass):
 
 class FreeAssembly:
     def __init__(self, gravity=False, **kwargs):
-        self.simulator = BaseSimulator()
+        self.simulator = BR2Simulator()
         self.actuation = defaultdict(list)
         self.free = {}  # Key: <segment name>_<order>_<rod name>
 
@@ -75,6 +80,14 @@ class FreeAssembly:
         self.k_multiplier = kwargs.get('t_multiplier', 1) * 1.0e-2
         self.nu_multiplier = kwargs.get('nu_multiplier', 1) * 1.0e-3
         self.kt_multiplier = kwargs.get('kt_multiplier', 1) * 0.0 #1e0
+
+    def save_state(self, **kwargs):
+        # kwargs: directory, time, verbose
+        save_state(self.simulator, **kwargs)
+
+    def load_state(self, **kwargs):
+        # kwargs: directory, verbose
+        load_state(self.simulator, **kwargs)
 
     def build(self, rod_info, connect_info, verbose=True, debug=False):
         '''

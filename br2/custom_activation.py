@@ -1,11 +1,9 @@
 import numpy as np
-from elastica._linalg import _batch_matvec
-from elastica.utils import _bspline
-
 import numba
 from numba import njit
-from elastica._elastica_numba._linalg import _batch_product_i_k_to_ik
-from elastica._elastica_numba._external_forces import NoForces
+from elastica._linalg import _batch_product_i_k_to_ik
+from elastica._linalg import _batch_matvec
+from elastica._external_forces import NoForces
 
 
 class PointForces(NoForces):

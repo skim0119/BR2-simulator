@@ -43,6 +43,16 @@ check_nan_type = 2 # 1: simple check and stop. 2: print location of nan
 check_steady_state_type = 2 # 1: maximum velocity stopper. 2: steady state check
 
 def main(action):
+    # Action Configuration
+    psi2Nm2 = 6895
+
+    # Actuation Profile
+    # maxBend = 35.0 * psi2Nm2
+    # maxTorque = 10.0 * psi2Nm2
+    action = {
+        "action1": 40 * psi2Nm2,
+        "action2": 0 * psi2Nm2
+    }
 
     # Set simulation final time
     RENDER = 1
@@ -54,32 +64,15 @@ def main(action):
         COLLECT_DATA_FOR_POSTPROCESSING=True,
     )
 
-    # Reset the environment before the new episode and get total number of simulation steps
+    # Reset the environment before the new episode
     total_steps = env.reset(
         rod_database_path='sample_database/sample_rod_library.json',
         assembly_config_path='sample_assembly/single_br2_v1.json'
     )
-    print(f'Total simulation steps: {total_steps}')
-
-    # Simulation loop starts
-    user_defined_condition = False
-    reward = 0.0
-    done = False
+    print(f'{total_steps=}')
 
     # Simulation
-    if DEBUG:
-        pos = [] # TODO: debug
-        vel = [] # TODO: debug
-        acc = [] # TODO: debug
-        dir = [] # TODO: debug
-        ome = [] # TODO: debug
-        alp = [] # TODO: debug
-        tmp = [] # TODO: debug
-        int_forc = []
-        int_torq = []
-        dam_forc = []
-        dam_torq = []
-        dilatati = []
+    env.run(action, 20)
 
     with tqdm(total=simulation_time) as pbar:
         prev_time = 0
@@ -102,19 +95,6 @@ def main(action):
                 check_nan=check_nan,
                 check_steady_state=check_steady_state
             )
-            if DEBUG and check_steady_state:
-                pos.append(info['position_delta'])
-                vel.append(info['velocity_delta'])
-                acc.append(info['acceleration_delta'])
-                dir.append(info['director_delta'])
-                ome.append(info['omega_delta'])
-                alp.append(info['alpha_delta'])
-                tmp.append(time)
-                int_torq.append(np.nanmax(np.linalg.norm(info['system']['seg1_0_RodBend'].internal_torques, axis=0)))
-                int_forc.append(np.nanmax(np.linalg.norm(info['system']['seg1_0_RodBend'].internal_forces, axis=0)))
-                dam_torq.append(np.nanmax(np.linalg.norm(info['system']['seg1_0_RodBend'].damping_torques, axis=0)))
-                dam_forc.append(np.nanmax(np.linalg.norm(info['system']['seg1_0_RodBend'].damping_forces, axis=0)))
-                dilatati.append(np.nanmax(info['system']['seg1_0_RodBend'].dilatation))
 
             # Progress bar update
             if (i_sim + 1) % pbar_update_interval == 0:
@@ -156,74 +136,7 @@ def main(action):
         print(f'{key}: {msg}')
 
 
-    # DEBUG
-    if DEBUG:
-        plt.figure()
-        plt.semilogy(tmp, pos, label='pos')
-        plt.semilogy(tmp, vel, label='vel')
-        plt.semilogy(tmp, acc, label='acc')
-        plt.semilogy(tmp, dir, label='dir')
-        plt.semilogy(tmp, ome, label='ome')
-        plt.semilogy(tmp, alp, label='alp')
-        plt.legend(loc='upper left')
-
-        plt.figure()
-        plt.semilogy(tmp, int_forc, label='int_F')
-        plt.semilogy(tmp, int_torq, label='int_T')
-        plt.legend(loc='upper left')
-
-        plt.figure()
-        plt.semilogy(tmp, dam_forc, label='damp_F')
-        plt.semilogy(tmp, dam_torq, label='damp_T')
-        plt.legend(loc='upper left')
-
-        plt.figure()
-        plt.plot(env.data_rods[0]['time'],
-                 np.array(env.data_rods[0]['position'])[:,1,-1] - 0.18,
-                 label='seg1')
-        plt.plot(env.data_rods[3]['time'],
-                 np.array(env.data_rods[3]['position'])[:,1,-1] - 0.18*2,
-                 label='seg2')
-        plt.plot(env.data_rods[6]['time'],
-                 np.array(env.data_rods[6]['position'])[:,1,-1] - 0.18*3,
-                 label='seg3')
-        plt.legend()
-        plt.show()
-
-
 if __name__ == "__main__":
-    psi2Nm2 = 6895
-
-    # Actuation Profile
-    # maxBend = 35.0 * psi2Nm2
-    # maxTorque = 10.0 * psi2Nm2
-    action = {
-        "action1": 50 * psi2Nm2,
-        "action2": 0 * psi2Nm2
-    }
 
     # run
-    main(action)
-
-    '''
-    # test nu(deprecated)
-    testrange = np.linspace(np.log10(0.01),np.log10(0.30), 10)
-    for lognu in testrange:
-        #lognu = np.log10(0.10)
-        main(action, lognu)
-        #break
-
-    nus = []
-    for lognu in testrange:
-        nu = 10 ** lognu
-        nus.append(nu)
-
-        data = np.load(os.path.join(PATH, f'damping/{lognu}.npz'))
-        time = data['time']
-        tip_position = data['position_rod'][:, 1, -1]
-        plt.plot(time, tip_position)
-        print(tip_position[-1])
-
-    plt.legend(nus)
-    plt.show()
-    '''
+    main()

@@ -1,11 +1,11 @@
 import numpy as np
-from elastica._elastica_numba._rotations import _get_rotation_matrix
-from elastica._elastica_numba._boundary_conditions import FreeRod
+from elastica._rotations import _get_rotation_matrix
+from elastica._boundary_conditions import ConstraintBase
 
 import numba
 from numba import njit
 
-class LastEndFixedRod(FreeRod):
+class LastEndFixedRod(ConstraintBase):
     """
     This boundary condition class fixes one end of the rod. Currently,
     this boundary condition fixes position and directors
@@ -18,7 +18,7 @@ class LastEndFixedRod(FreeRod):
             3D (dim, dim, 1) array containing data with 'float' type.
     """
 
-    def __init__(self, fixed_position, fixed_directors):
+    def __init__(self, fixed_position, fixed_directors, **kwargs):
         """
         Parameters
         ----------
@@ -27,7 +27,7 @@ class LastEndFixedRod(FreeRod):
         fixed_directors : numpy.ndarray
             3D (dim, dim, 1) array containing data with 'float' type.
         """
-        FreeRod.__init__(self)
+        super().__init__(**kwargs)
         self.fixed_position = fixed_position
         self.fixed_directors = fixed_directors
 
