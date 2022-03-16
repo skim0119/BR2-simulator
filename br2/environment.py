@@ -1,18 +1,18 @@
-from typing import Optional 
+from typing import Optional, Union
 
 import os
 import copy
 import time
 
+from tqdm import tqdm
+
 import numpy as np
 
-from elastica._calculus import _isnan_check
 from elastica import *
+from elastica._calculus import _isnan_check
 from elastica.timestepper import extend_stepper_interface
 
-from post_processing import (
-    plot_video_with_surface,
-)
+from post_processing import plot_video_with_surface
 
 from br2.free_simulator import FreeAssembly
 
@@ -20,24 +20,31 @@ from br2.free_simulator import FreeAssembly
 class Environment:
     def __init__(
         self,
-        fps,
         rendering_fps:int=25,
         time_step:float=2.0e-5,
         final_time:Optional[float]=None,
         flag_collect_data:bool=False,
     ):
-        # Integrator type
+        """
+
+        Parameters
+        ----------
+        rendering_fps : int
+        time_step : float
+        final_time : Optional[float]
+        flag_collect_data : bool
+        """
+        # Integrator type (pyelastica==0.2.2 only provide PositionVerlet)
         self.StatefulStepper = PositionVerlet()
 
         # Simulation parameters
-        self.final_time = final_time
+        self.final_time = final_time # TODO
         self.time_step = time_step
 
         # Recording speed
-        self.rendering_fps = fps
+        self.rendering_fps = rendering_fps
         self.step_skip = int(1.0 / (self.rendering_fps * self.time_step)) # match rendering fps to physical time
-        self.capture_interval = None #(0.3, 0.5)#None
-        print(f'{self.step_skip=}')
+        self.capture_interval = None # TODO: ex.(0.3, 0.5)
 
         # Rod
         self.shearable_rods = {}
@@ -54,7 +61,7 @@ class Environment:
         # rod parameters defined by user in a list.
         self.flag_collect_data = flag_collect_data
 
-    def save_state(self, directory: str='', verbose:bool=False):
+    def save_state(self, directory: str='', verbose:bool=False) -> None:
         """
         Save state parameters of each rod.
 
@@ -68,7 +75,7 @@ class Environment:
         """
         self.assy.save_state(directory=directory, time=self.time, verbose=verbose)
 
-    def load_state(self, directory: str='', clear_callback:bool=False, verbose:bool=False):
+    def load_state(self, directory: str='', clear_callback:bool=False, verbose:bool=False) -> None:
         """
         Load the rod-state.
         Compatibale with 'save_state' method.
@@ -97,6 +104,7 @@ class Environment:
         ----------
         rod_database_path : str
         assembly_config_path : str
+        start_time : float
         """
 
         assert os.path.exists(rod_database_path), "Rod database path does not exists."
@@ -122,20 +130,24 @@ class Environment:
         )
         self.time = start_time # simulation time
 
-    def run(self, action:dict, duration:float, check_nan:bool=False, check_steady_state:bool=False) -> bool:
+    def run(self, action:dict, duration:float, disable_progress_bar:bool=True, check_nan:bool=False, check_steady_state:bool=False) -> bool:
         # Set action
         self.assy.set_actuation(action)
 
         # Simulation
         time = self.time
-        while time >= self.time + duration:
-            time = self.do_step(
-                self.StatefulStepper,
-                self.stages_and_updates,
-                self.simulator,
-                self.time,
-                self.time_step,
-            )
+        with tqdm.tqdm(total=duration, mininternval=0.5, disable=disable_progress_bar) as pbar:
+            pbar.set_description(f"Processing ({n_iter}/{total_steps})")
+            while time >= self.time + duration:
+                time = self.do_step(
+                    self.StatefulStepper,
+                    self.stages_and_updates,
+                    self.simulator,
+                    self.time,
+                    self.time_step,
+                )
+                pbar.update(self.time_step)
+        self.time = time
 
         # Check steady state
         if check_steady_state == 1:
@@ -197,39 +209,34 @@ class Environment:
                 info['done_due_to_nan'] = True
                 #print("Nan detected, exiting simulation now")
 
-        self.time = time
-
-    def post_processing(self, filename_video, save_folder, data_tag=0, **kwargs):
+    def post_processing(self, filename_video:str, save_folder:str, data_tag:Union[int,str]=0, **kwargs) -> None:
         """
         Make video 3D rod movement in time.
+
         Parameters
         ----------
-        filename_video
-        Returns
-        -------
-
+        filename_video : str
+        save_folder : str
+        data_tag : int
         """
-
         if self.flag_collect_data:
-            plot_video_with_surface(
-                self.data_rods,
-                video_name=filename_video,
-                fps=self.rendering_fps,
-                step=1,
-                save_folder=save_folder,
-                **kwargs
-            )
+            print("call back function is not called anytime during simulation")
+            print("set flag_collect_data=True")
+            return
 
-            position_data_path = os.path.join(save_folder, f"br2_data_{data_tag}.npz")
-            self.save_data(position_data_path)
+        plot_video_with_surface(
+            self.data_rods,
+            video_name=filename_video,
+            fps=self.rendering_fps,
+            step=1,
+            save_folder=save_folder,
+            **kwargs
+        )
 
-        else:
-            raise RuntimeError(
-                "call back function is not called anytime during simulation, "
-                "change COLLECT_DATA=True"
-            )
+        position_data_path = os.path.join(save_folder, f"br2_data_{data_tag}.npz")
+        self.save_data(position_data_path)
 
-    def save_data(self, path):
+    def save_data(self, path:str) -> None:
         # TODO
         # TEMP
         position_rod = np.array(self.data_rods[0]["position"])
@@ -238,31 +245,4 @@ class Environment:
             path,
             time=np.array(self.data_rods[0]["time"]),
             position_rod=position_rod,
-        )
-        return
-        # Transform nodal to elemental positions
-        position_rod1 = np.array(self.data_rod1["position"])
-        position_rod1 = 0.5 * (position_rod1[..., 1:] + position_rod1[..., :-1])
-
-        # Transform nodal to elemental positions
-        position_rod2 = np.array(self.data_rod2["position"])
-        position_rod2 = 0.5 * (position_rod2[..., 1:] + position_rod2[..., :-1])
-
-        # Transform nodal to element positions
-        position_rod3 = np.array(self.data_rod3["position"])
-        position_rod3 = 0.5 * (position_rod3[..., 1:] + position_rod3[..., :-1])
-
-        # Save rod position (for povray)
-        np.savez(
-            path,
-            time=np.array(self.data_rod1["time"]),
-            position_rod1=position_rod1,
-            radii_rod1=np.array(self.data_rod1["radius"]),
-            director_rod1=np.array(self.data_rod1["director"]),
-            position_rod2=position_rod2,
-            radii_rod2=np.array(self.data_rod2["radius"]),
-            director_rod2=np.array(self.data_rod2["director"]),
-            position_rod3=position_rod3,
-            radii_rod3=np.array(self.data_rod3["radius"]),
-            director_rod3=np.array(self.data_rod3["director"]),
         )

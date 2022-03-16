@@ -16,9 +16,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
 #sys.settrace
-from br2.set_environment_br2 import (
-    Environment,
-)
+from br2.environment import Environment
 
 PATH = 'result_br2_17'
 
@@ -42,7 +40,7 @@ check_steady_state_interval = 100
 check_nan_type = 2 # 1: simple check and stop. 2: print location of nan
 check_steady_state_type = 2 # 1: maximum velocity stopper. 2: steady state check
 
-def main(action):
+def main():
     # Action Configuration
     psi2Nm2 = 6895
 
@@ -72,7 +70,10 @@ def main(action):
     print(f'{total_steps=}')
 
     # Simulation
-    env.run(action, 20)
+    env.run(
+        action=action,
+        duration=20.0
+    )
 
     with tqdm(total=simulation_time) as pbar:
         prev_time = 0
@@ -135,8 +136,5 @@ def main(action):
     for key, msg in info.items():
         print(f'{key}: {msg}')
 
-
 if __name__ == "__main__":
-
-    # run
     main()
