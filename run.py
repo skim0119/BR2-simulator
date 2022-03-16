@@ -15,13 +15,15 @@ from tqdm import tqdm
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
-sys.path.append("../") # For elastica
 #sys.settrace
-from set_environment_br2 import (
+from br2.set_environment_br2 import (
     Environment,
 )
 
 PATH = 'result_br2_17'
+
+np.set_printoptions(precision=4)
+
 SAVE_PATH = os.path.join(PATH, 'rod_save')
 os.makedirs(PATH, exist_ok=1)
 os.makedirs(SAVE_PATH, exist_ok=1)
@@ -54,10 +56,8 @@ def main(action):
 
     # Reset the environment before the new episode and get total number of simulation steps
     total_steps = env.reset(
-        rod_info='sample_rod_library.json',
-        connect_info='sample_assembly/triple_br2_v1.json'
-        #'sample_assembly/double_br2_v1.json'
-        #"sample_BR2_config.json"
+        rod_database_path='sample_database/sample_rod_library.json',
+        assembly_config_path='sample_assembly/single_br2_v1.json'
     )
     print(f'Total simulation steps: {total_steps}')
 

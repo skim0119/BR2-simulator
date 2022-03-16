@@ -7,21 +7,21 @@ import numpy as np
 from elastica._calculus import _isnan_check
 from elastica import *
 from elastica.timestepper import extend_stepper_interface
+from elastica.restart import save_state, load_state
 
 from post_processing import (
     plot_video_with_surface,
 )
 
-from free_simulator import FreeAssembly
+from br2.free_simulator import FreeAssembly
 
-np.set_printoptions(precision=4)
 
 class Environment:
     def __init__(
-            self,
-            final_time,
-            fps,
-            COLLECT_DATA_FOR_POSTPROCESSING=False,
+        self,
+        final_time,
+        fps,
+        COLLECT_DATA_FOR_POSTPROCESSING=False,
     ):
         # Integrator type
         self.StatefulStepper = PositionVerlet()
@@ -108,10 +108,18 @@ class Environment:
                 callback_defaultdict.clear()
             print('callback cleared')
 
-    def reset(self, rod_info, connect_info, **kwargs):
+    def reset(self, rod_database_path:str, assembly_config_path:str, **kwargs):
         """
-        This function, creates the simulation environment.
+        Creates the simulation environment.
+
+        Parameters
+        ----------
+        rod_database_path : str
+        assembly_config_path : str
         """
+
+        assert os.path.exists(rod_database_path), "Rod database path does not exists."
+        assert os.path.exists(assembly_config_path), "Assembly configuration does not exists."
 
         self.assy = FreeAssembly(**kwargs)
 
@@ -135,6 +143,9 @@ class Environment:
         )
 
         return self.total_steps
+
+    def run(self, action:dict, duration:float, check_nan:bool=False, check_steady_state:bool=False):
+        pass
 
     def step(self, action, time, check_nan=False, check_steady_state=False):
         done = (self.final_time < time)
