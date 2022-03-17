@@ -20,7 +20,7 @@ from br2.free_simulator import FreeAssembly
 
 
 @dataclass
-class Datapaths:
+class DataPaths:
     tag: str
 
     @property
@@ -142,7 +142,7 @@ class Environment:
         self.StatefulStepper = PositionVerlet()
 
         # Set paths
-        self.paths = Datapaths(run_tag)
+        self.paths = DataPaths(run_tag)
         self.paths.initialize()
 
         # Simulation parameters
