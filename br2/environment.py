@@ -84,6 +84,32 @@ class TerminalInfo:
             if name.endswith("status"):
                 print(f"{name} = {getattr(self, name)}")
 
+    @property
+    def combined_nan_status(self) -> bool:
+        """
+        Combined status for if NaN exists. Return true if any NaN status is true.
+
+        Notes
+        -----
+        If check_nan is not given in simulation, this property does not give correct indication.
+        """
+        status_list = [name for name in self.__dir__() if name.endswith("status") and "_nan_" in name]
+        return all(status_list)
+
+    @property
+    def combined_steady_state_status(self) -> bool:
+        """
+        Combined status for steady state. Return true if all steady-state status is true.
+
+        Notes
+        -----
+        If check_steady_state is not given in simulation, this property does not give correct indication.
+        """
+        status_list = [name for name in self.__dir__() if name.endswith("status") and "_steady_state_" in name]
+        return any(status_list)
+
+
+
 class Environment:
     """
 
@@ -299,21 +325,11 @@ class Environment:
         if check_nan:
             # fmt: off
             # Position of the rod cannot be NaN, it is not valid, stop the simulation
-            invalid_values_conditions = (
-                [_isnan_check(self.shearable_rods[name].position_collection)
-                    for name in self.shearable_rods.keys()] + 
-                [_isnan_check(self.shearable_rods[name].velocity_collection)
-                    for name in self.shearable_rods.keys()] +
-                [_isnan_check(self.shearable_rods[name].director_collection)
-                    for name in self.shearable_rods.keys()] +
-                [_isnan_check(self.shearable_rods[name].omega_collection)
-                    for name in self.shearable_rods.keys()])
+            status.position_nan_status = any([_isnan_check(self.shearable_rods[name].position_collection) for name in self.shearable_rods.keys()] )
+            status.velocity_nan_status = any([_isnan_check(self.shearable_rods[name].velocity_collection) for name in self.shearable_rods.keys()])
+            status.director_nan_status = any([_isnan_check(self.shearable_rods[name].director_collection) for name in self.shearable_rods.keys()])
+            status.omega_nan_status = any([_isnan_check(self.shearable_rods[name].omega_collection) for name in self.shearable_rods.keys()])
             # fmt: on
-
-            if any(invalid_values_conditions):
-                done = True
-                info["done_due_to_nan"] = True
-                # print("Nan detected, exiting simulation now")
 
         status.end_status = True
         return status
