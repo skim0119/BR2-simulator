@@ -63,8 +63,6 @@ class FreeCallback(CallBackBaseClass):
         self.callback_params["lengths"].append(system.lengths.copy())
         self.callback_params["dilatation"].append(system.dilatation.copy())
         self.callback_params["radius"].append(system.radius.copy())
-        self.callback_params["com"].append( system.compute_position_center_of_mass() )
-        return
 
 
 class FreeAssembly:
@@ -177,14 +175,16 @@ class FreeAssembly:
             k_connection = np.pi * outer_radius * E / n_elem * self.k_multiplier  # 50  # 1e5
             nu_connection = base_length / n_elem * self.nu_multiplier
             kt_connection = outer_radius / 2 * self.kt_multiplier  # 1e-3
-            print(f'  {k_connection=} {nu_connection=} {kt_connection=}')
+            #print(f'  {k_connection=} {nu_connection=} {kt_connection=}')
             for rod_i in range(len(seg_rods)):
                 first_rod_name = seg_rods[rod_i-1]
                 second_rod_name = seg_rods[rod_i]
                 print(f"    connecting seg {seg_idx}: {first_rod_name} || {second_rod_name}")
                 self.add_parallel_connection(first_rod_name,
                                              second_rod_name,
-                                             k=k_connection, nu=nu_connection, kt=kt_connection)
+                                             k=k_connection,
+                                             nu=nu_connection,
+                                             kt=kt_connection)
 
             if seg_idx > 0:
                 '''Serial Connection'''
@@ -197,7 +197,7 @@ class FreeAssembly:
                 nu_connection = base_length / n_elem * self.nu_multiplier
                 kt_connection = outer_radius / 2 * self.kt_multiplier  # 1e-3
                 print("  connecting seg-%d and seg-%d" % (seg_idx, seg_idx + 1))
-                print(f"  {k_connection=} {nu_connection=} {kt_connection=}")
+                #print(f"  {k_connection=} {nu_connection=} {kt_connection=}")
                 print(f"  previous segment rods: {prev_seg_rods}")
                 print(f"  current segment rods: {seg_rods}")
                 self.add_serial_connection(
