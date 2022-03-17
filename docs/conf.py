@@ -89,5 +89,9 @@ html_title = "BR2-Simulator"
 html_static_path = ['_static']
 #html_css_files = []
 
+
+# -- Options for autodoc  ---------------------------------------------------
+autodoc_member_order = 'bysource'
+
 # -- Options for numpydoc ---------------------------------------------------
 numpydoc_show_class_members = False
