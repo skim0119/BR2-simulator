@@ -76,12 +76,18 @@ master_doc = 'index'
 # a list of builtin themes.
 #
 html_theme = 'sphinx_book_theme'
-html_theme_option = {
+html_title = "BR2-simulator"
+html_logo = "_static/assets/logo_v1.png"
+html_theme_options = {
+    "path_to_docs": "docs",
     "repository_url": "https://github.com/skim0119/BR2-simulator",
+    "repository_branch": "main",
+    "use_issues_button": True,
     "use_repository_button": True,
+    "use_edit_page_button": True,
+    "logo_only": True
 }
-html_title = "BR2-Simulator"
-#html_logo = ""
+html_css_files = ['custom.css']
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

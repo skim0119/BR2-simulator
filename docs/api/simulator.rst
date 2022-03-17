@@ -1,11 +1,7 @@
-Environment
-===========
+Environment API
+===============
 
 .. automodule::  br2.environment
-
-
-Environment
------------
 
 .. autoclass:: Environment
    :inherited-members:
