@@ -16,14 +16,37 @@ from post_processing import plot_video_with_surface
 
 from br2.free_simulator import FreeAssembly
 
+@dataclass
+class Datapaths:
+    tag:str
+
+    @property
+    def paths(self) -> str:
+        return f"result_{tag}"
+    @property
+    def simulation(self) -> str:
+        return os.path.join(self.paths, "simulation_saves")
+    @property
+    def renderings(self) -> str:
+        return os.path.join(self.paths, "renderings")
+    @property
+    def data(self) -> str:
+        return os.path.join(self.paths, "data")
+    def initialize(self):
+        os.makedirs(self.paths, exist_ok1)
+        os.makedirs(self.simulation, exist_ok1)
+        os.makedirs(self.renderings, exist_ok1)
+        os.makedirs(self.data, exist_ok1)
 
 class Environment:
+
+
     def __init__(
         self,
+        run_tag:str,
         rendering_fps:int=25,
         time_step:float=2.0e-5,
         final_time:Optional[float]=None,
-        flag_collect_data:bool=False,
     ):
         """
 
@@ -32,10 +55,13 @@ class Environment:
         rendering_fps : int
         time_step : float
         final_time : Optional[float]
-        flag_collect_data : bool
         """
         # Integrator type (pyelastica==0.2.2 only provide PositionVerlet)
         self.StatefulStepper = PositionVerlet()
+
+        # Set paths
+        self.paths = Datapaths(run_tag)
+        self.paths.initialize()
 
         # Simulation parameters
         self.final_time = final_time # TODO
@@ -57,11 +83,7 @@ class Environment:
         self.acceleration_threshold = 10**(0)
         self.alpha_threshold = 1.0e+1
 
-        # Collect data is a boolean. If it is true callback function collects
-        # rod parameters defined by user in a list.
-        self.flag_collect_data = flag_collect_data
-
-    def save_state(self, directory: str='', verbose:bool=False) -> None:
+    def save_state(self, directory: Optional[str]=None, verbose:bool=False) -> None:
         """
         Save state parameters of each rod.
 
@@ -70,9 +92,11 @@ class Environment:
 
         Parameters
         ----------
-        directory: str
+        directory: Optional[str]
             Directory path name. The path must exist.
         """
+        if not directory:
+            directory = self.paths.simulation
         self.assy.save_state(directory=directory, time=self.time, verbose=verbose)
 
     def load_state(self, directory: str='', clear_callback:bool=False, verbose:bool=False) -> None:
@@ -84,9 +108,11 @@ class Environment:
 
         Parameters
         ----------
-        directory : str
+        directory : Optional[str]
             Directory path name. 
         """
+        if not directory:
+            directory = self.paths.simulation
         self.assy.load_state(directory=directory, verbose=verbose)
 
         # Clear callback
@@ -116,10 +142,9 @@ class Environment:
         self.shearable_rods = self.assy.build(rod_info, connect_info)
         self.simulator = self.assy.simulator
 
-        if self.flag_collect_data:
-            # Collect data using callback function for postprocessing
-            # set the diagnostics for rod and collect data
-            self.data_rods = self.assy.generate_callbacks(self.step_skip, time_interval=self.capture_interval) #[seg,rod]
+        # Collect data using callback function for postprocessing
+        # set the diagnostics for rod and collect data
+        self.data_rods = self.assy.generate_callbacks(self.step_skip, time_interval=self.capture_interval) #[seg,rod]
         # Finalize simulation environment. After finalize, you cannot add
         # any forcing, constrain or call back functions
         self.simulator.finalize()
@@ -130,12 +155,35 @@ class Environment:
         )
         self.time = start_time # simulation time
 
-    def run(self, action:dict, duration:float, disable_progress_bar:bool=True, check_nan:bool=False, check_steady_state:bool=False) -> bool:
+    def run(self, action:dict, duration:Optional[float]=None, disable_progress_bar:bool=True, check_nan:bool=False, check_steady_state:bool=False) -> bool:
+        """
+        Run simulation for a duration given action.
+
+        Parameters
+        ----------
+        action : dict
+            action
+        duration : Optional[float]
+            If duration is not specified, run a single step (duration=step_size)
+        disable_progress_bar : bool
+            disable_progress_bar
+        check_nan : bool
+            check_nan
+        check_steady_state : bool
+            check_steady_state
+
+        Returns
+        -------
+        bool
+
+        """
         # Set action
         self.assy.set_actuation(action)
 
         # Simulation
         time = self.time
+        if not duration:
+            duration = self.time_step
         with tqdm.tqdm(total=duration, mininternval=0.5, disable=disable_progress_bar) as pbar:
             pbar.set_description(f"Processing ({n_iter}/{total_steps})")
             while time >= self.time + duration:
@@ -219,10 +267,6 @@ class Environment:
         save_folder : str
         data_tag : int
         """
-        if self.flag_collect_data:
-            print("call back function is not called anytime during simulation")
-            print("set flag_collect_data=True")
-            return
 
         plot_video_with_surface(
             self.data_rods,
@@ -246,3 +290,7 @@ class Environment:
             time=np.array(self.data_rods[0]["time"]),
             position_rod=position_rod,
         )
+
+    def close(self):
+        pass
+
