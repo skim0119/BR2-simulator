@@ -25,23 +25,18 @@ def main():
     action = {"action1": 35 * psi2Nm2, "action2": 0 * psi2Nm2}
 
     # Prepare environment
-    env = Environment(
-        run_tag=args.tag,
-        final_time=simulation_time,
-    )
+    env = Environment(run_tag=args.tag)
     env.reset(
         rod_database_path="sample_database/sample_rod_library.json",
         assembly_config_path="sample_assembly/single_br2_v1.json",
     )
 
     # Simulation
-    env.run(action=action, duration=20.0)
+    status = env.run(action=action, duration=20.0, check_nan=True, check_steady_state=True)
+    print(status)
 
     # Post Processing
     env.render_video(
-        filename_video="br2_simulation",
-        save_folder=PATH,
-        data_id=0,
         # The following parameters are optional
         x_limits=(-0.13, 0.13),  # Set bounds on x-axis
         y_limits=(-0.00, 0.5),  # Set bounds on y-axis
@@ -52,6 +47,7 @@ def main():
         vis3D_director=False,
         vis2D_director_lastelement=False,
     )
+    env.save_data()
 
     # Terminate
     env.close()

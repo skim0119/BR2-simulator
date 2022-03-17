@@ -5,6 +5,7 @@ from elastica.utils import Tolerance
 from elastica._calculus import _clip_array
 from elastica._linalg import _batch_cross, _batch_dot, _batch_norm, _batch_matvec
 from elastica._linalg import _batch_product_i_k_to_ik
+from elastica.boundary_conditions import ConstraintBase
 
 from br2.surface_connection_parallel_rod_numba import _single_inv_rotate, _single_get_rotation_matrix
 
@@ -108,9 +109,9 @@ class FreeTwistActuation(NoForces):
         )
         '''
 
-class FreeBaseEndSoftFixed(FreeRod):
+class FreeBaseEndSoftFixed(ConstraintBase):
 
-    def __init__(self, fixed_position, fixed_directors, k, nu, kt):
+    def __init__(self, fixed_position, fixed_directors, k, nu, kt, **kwargs):
         """
         Parameters
         ----------
@@ -119,7 +120,7 @@ class FreeBaseEndSoftFixed(FreeRod):
         fixed_directors : numpy.ndarray
             3D (dim, dim, 1) array containing data with 'float' type.
         """
-        FreeRod.__init__(self)
+        super().__init__(**kwargs)
         self.fixed_position = fixed_position # Initial position
         self.fixed_directors = fixed_directors # Initial directors
         self.k = k

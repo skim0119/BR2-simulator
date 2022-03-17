@@ -9,8 +9,8 @@
         "inner_radius"   : 0.006522,
         "density"        : 1500,
         "nu"             : 0.089178,
-        "youngs_modulus" : 1e7,
-        "poisson_ratio"  : 0.5
+        "youngs_modulus" : 1.00e7,
+        "shear_modulus"  : 6.66e6 
     },
     "Rods": {
         "RodBend": {

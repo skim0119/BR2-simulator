@@ -43,7 +43,7 @@ class DataPaths:
 
     @property
     def paths(self) -> str:
-        return f"result_{tag}"
+        return f"result_{self.tag}"
 
     @property
     def simulation(self) -> str:
@@ -61,10 +61,10 @@ class DataPaths:
         """
         Initialization step: create missing directories
         """
-        os.makedirs(self.paths, exist_ok1)
-        os.makedirs(self.simulation, exist_ok1)
-        os.makedirs(self.renderings, exist_ok1)
-        os.makedirs(self.data, exist_ok1)
+        os.makedirs(self.paths, exist_ok=1)
+        os.makedirs(self.simulation, exist_ok=1)
+        os.makedirs(self.renderings, exist_ok=1)
+        os.makedirs(self.data, exist_ok=1)
 
 
 @dataclass
@@ -88,10 +88,13 @@ class TerminalInfo:
 
     def __str__(self):
         """Print all status"""
+        messages = []
         for name in self.__dir__():
             if name.endswith("status"):
-                print(f"{name} = {getattr(self, name)}")
+                messages.append(f"{name} = {getattr(self, name)}")
+        return '\n'.join(messages)
 
+    @property
     def combined_nan_status(self) -> bool:
         """
         Combined status for if NaN exists. Return true if any NaN status is true.
@@ -101,12 +104,13 @@ class TerminalInfo:
         If check_nan is not given in simulation, this property does not give correct indication.
         """
         status_list = [
-            name
+            getattr(self, name)
             for name in self.__dir__()
-            if name.endswith("status") and "_nan_" in name
+            if name.endswith("status") and "_nan_" in name and ("combined_" not in name)
         ]
         return all(status_list)
 
+    @property
     def combined_steady_state_status(self) -> bool:
         """
         Combined status for steady state. Return true if all steady-state status is true.
@@ -116,9 +120,9 @@ class TerminalInfo:
         If check_steady_state is not given in simulation, this property does not give correct indication.
         """
         status_list = [
-            name
+            getattr(self, name)
             for name in self.__dir__()
-            if name.endswith("status") and "_steady_state_" in name
+            if name.endswith("status") and ("_steady_state_" in name) and ("combined_" not in name)
         ]
         return any(status_list)
 
@@ -197,7 +201,7 @@ class Environment:
         self.assy = FreeAssembly(**kwargs)
 
         """rod name -> [seg,rod]"""
-        self.shearable_rods = self.assy.build(rod_info, connect_info)
+        self.shearable_rods = self.assy.build(rod_database_path, assembly_config_path)
         self.simulator = self.assy.simulator
 
         # Collect data using callback function for postprocessing
@@ -261,11 +265,10 @@ class Environment:
         time = self.time
         if not duration:
             duration = self.time_step
-        with tqdm.tqdm(
-            total=duration, mininternval=0.5, disable=disable_progress_bar
+        with tqdm(
+            total=duration, mininterval=0.5, disable=disable_progress_bar
         ) as pbar:
-            pbar.set_description(f"Processing ({n_iter}/{total_steps})")
-            while time >= self.time + duration:
+            while time < self.time + duration:
                 time = self.do_step(
                     self.StatefulStepper,
                     self.stages_and_updates,
@@ -383,20 +386,14 @@ class Environment:
 
     def render_video(
         self,
-        filename_video: str,
-        save_folder: str,
-        data_tag: Union[int, str] = 0,
         **kwargs,
     ) -> None:
         """
         Make video 3D rod movement in time.
-
-        Parameters
-        ----------
-        filename_video : str
-        save_folder : str
-        data_tag : Union[int, str]
         """
+
+        filename_video = "br2_simulation"
+        save_folder = self.paths.renderings
 
         plot_video_with_surface(
             self.data_rods,
@@ -410,9 +407,19 @@ class Environment:
         position_data_path = os.path.join(save_folder, f"br2_data_{data_tag}.npz")
         self.save_data(position_data_path)
 
-    def save_data(self, path: str) -> None:
-        # TODO
-        # TEMP
+    def save_data(self, tag:Optional[str]=None) -> None:
+        """save_data.
+
+        Parameters
+        ----------
+        tag : Optional[str]
+            String tag that appends to the file name.
+        """
+        if not tag:
+            filename = f"br2_data.npz"
+        else:
+            filename = f"br2_data_{tag}.npz"
+        path = os.path.join(self.paths.data, filename)
         position_rod = np.array(self.data_rods[0]["position"])
         position_rod = 0.5 * (position_rod[..., 1:] + position_rod[..., :-1])
         np.savez(
