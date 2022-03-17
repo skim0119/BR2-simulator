@@ -4,11 +4,21 @@ Simulator Environment
 .. automodule::  br2.environment
 
 
-API
----
+Environment
+-----------
+
 .. autoclass:: Environment
    :inherited-members:
    :undoc-members:
    :exclude-members: 
-   :show-inheritance:
 
+
+Terminal Information
+--------------------
+
+.. autoclass:: TerminalInfo
+
+Data Paths
+----------
+
+.. autoclass:: Datapaths

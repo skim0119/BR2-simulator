@@ -25,28 +25,78 @@ class Datapaths:
 
     @property
     def paths(self) -> str:
+        """
+        Parent directory path
+        """
         return f"result_{tag}"
 
     @property
     def simulation(self) -> str:
+        """
+        Path to save the simulation data for pause/restart purpose.
+        """
         return os.path.join(self.paths, "simulation_saves")
 
     @property
     def renderings(self) -> str:
+        """
+        Path to save all the rendering videos.
+        """
         return os.path.join(self.paths, "renderings")
 
     @property
     def data(self) -> str:
+        """
+        Path to save data for the post-processing.
+        """
         return os.path.join(self.paths, "data")
 
     def initialize(self):
+        """
+        Initialization step: create missing directories
+        """
         os.makedirs(self.paths, exist_ok1)
         os.makedirs(self.simulation, exist_ok1)
         os.makedirs(self.renderings, exist_ok1)
         os.makedirs(self.data, exist_ok1)
 
+@dataclass
+class TerminalInfo:
+    """
+        Attributes
+        ----------
+        end_status : bool
+            Indicate if simulation reached end.
+        <variable>_nan_status : bool
+            Indicate if NaN exists in <variable>. Only given when `check_nan` is True.
+        <variable>_steady_state_status : bool
+            Indicate if <variable> is in steady-state. Only given when `check_steady_state` is given.
+        max_velocity : float
+            Maximum velocity at the end of the run. Only given when `check_steady_state=1`.
+
+    """
+
+    end_status:bool = False
+
+    def __str__(self):
+        """ Print all status """
+        for name in self.__dir__():
+            if name.endswith("status"):
+                print(f"{name} = {getattr(self, name)}")
 
 class Environment:
+    """
+
+    Attributes
+    ----------
+    rendering_fps : int
+        Rendering fps for output videos. (default=25)
+    time_step : float
+        Simulation timestep. Faster time-step could reduce the simulation walltime,
+        but the simulation may be unstable. (default=2.0e-5)
+    final_time : Optional[float]
+    """
+
     def __init__(
         self,
         run_tag: str,
@@ -54,14 +104,6 @@ class Environment:
         time_step: float = 2.0e-5,
         final_time: Optional[float] = None,
     ):
-        """
-
-        Parameters
-        ----------
-        rendering_fps : int
-        time_step : float
-        final_time : Optional[float]
-        """
         # Integrator type (pyelastica==0.2.2 only provide PositionVerlet)
         self.StatefulStepper = PositionVerlet()
 
@@ -70,7 +112,7 @@ class Environment:
         self.paths.initialize()
 
         # Simulation parameters
-        self.final_time = final_time  # TODO
+        self.final_time = final_time  # TODO: either remove or implement stopper
         self.time_step = time_step
 
         # Recording speed
@@ -90,49 +132,6 @@ class Environment:
         self.omega_threshold = 1.0e-3
         self.acceleration_threshold = 10 ** (0)
         self.alpha_threshold = 1.0e1
-
-    def save_state(
-        self, directory: Optional[str] = None, verbose: bool = False
-    ) -> None:
-        """
-        Save state parameters of each rod.
-
-        TODO : environment list variable is not uniform at the current stage of development.
-        It would be nice if we have set list (like env.system) that iterates all the rods.
-
-        Parameters
-        ----------
-        directory: Optional[str]
-            Directory path name. The path must exist.
-        """
-        if not directory:
-            directory = self.paths.simulation
-        self.assy.save_state(directory=directory, time=self.time, verbose=verbose)
-
-    def load_state(
-        self, directory: str = "", clear_callback: bool = False, verbose: bool = False
-    ) -> None:
-        """
-        Load the rod-state.
-        Compatibale with 'save_state' method.
-
-        If the save-file does not exist, it returns error.
-
-        Parameters
-        ----------
-        directory : Optional[str]
-            Directory path name.
-        """
-        if not directory:
-            directory = self.paths.simulation
-        self.assy.load_state(directory=directory, verbose=verbose)
-
-        # Clear callback
-        if clear_callback:
-            for callback_defaultdict in self.data_rods:
-                callback_defaultdict.clear()
-            if verbose:
-                print("callback cleared")
 
     def reset(
         self,
@@ -181,31 +180,29 @@ class Environment:
         self,
         action: dict,
         duration: Optional[float] = None,
-        disable_progress_bar: bool = True,
+        disable_progress_bar: bool = False,
         check_nan: bool = False,
-        check_steady_state: bool = False,
-    ) -> bool:
+        check_steady_state: Optional[int] = None,
+    ) -> Optional[TerminalInfo]:
         """
         Run simulation for a duration given action.
 
         Parameters
         ----------
         action : dict
-            action
+            Action specified for each rods.
         duration : Optional[float]
             If duration is not specified, run a single step (duration=step_size)
         disable_progress_bar : bool
-            disable_progress_bar
         check_nan : bool
-            check_nan
-        check_steady_state : bool
-            check_steady_state
-
-        Returns
-        -------
-        bool
-
+            If True, check if any Nan is detected in the simulation at the end of the run. (default=False)
+        check_steady_state : Optional[int]
+            Check steady state condition at the end of the run. If 1, the velocity steady-
+            state is checked. If 2, dynamic steady-state condition is checked.(default=None)
         """
+        # Initialize status
+        status = TerminalInfo()
+
         # Set action
         self.assy.set_actuation(action)
 
@@ -230,17 +227,14 @@ class Environment:
 
         # Check steady state
         if check_steady_state == 1:
-            # fmt: off
-            # velocity test
+            # Velocity steady-state test
             velocities = [np.array(self.shearable_rods[key].position_collection)
                 for key in self.shearable_rods.keys()]
             max_velocity = max([np.linalg.norm(v, axis=0).max() for v in velocities])
-            info["max_velocity"] = max_velocity
-            if max_velocity < self.velocity_threshold:
-                # print("Steady-state (minimum velocity), exiting simulation now")
-                done = True
-                info["done_by_steady_state"] = "maximum_velocity"
+            status.velocity_steady_state_status = max_velocity < self.velocity_threshold
+            status.max_velocity = max_velocity
         elif check_steady_state == 2:
+            # fmt: off
             keys = list(self.shearable_rods.keys())
             prev_position = np.concatenate([self.shearable_rods[name].position_collection for name in keys], axis=-1)
             prev_velocity = np.concatenate([self.shearable_rods[name].velocity_collection for name in keys], axis=-1)
@@ -303,6 +297,7 @@ class Environment:
 
         # Check NaN
         if check_nan:
+            # fmt: off
             # Position of the rod cannot be NaN, it is not valid, stop the simulation
             invalid_values_conditions = (
                 [_isnan_check(self.shearable_rods[name].position_collection)
@@ -313,17 +308,61 @@ class Environment:
                     for name in self.shearable_rods.keys()] +
                 [_isnan_check(self.shearable_rods[name].omega_collection)
                     for name in self.shearable_rods.keys()])
+            # fmt: on
 
             if any(invalid_values_conditions):
                 done = True
                 info["done_due_to_nan"] = True
                 # print("Nan detected, exiting simulation now")
 
+        status.end_status = True
+        return status
+
+    def save_state(
+        self, directory: Optional[str] = None, verbose: bool = False
+    ) -> None:
+        """
+        Save state parameters of each rod.
+
+        Parameters
+        ----------
+        directory: Optional[str]
+            Directory path name. The path must exist.
+        """
+        if not directory:
+            directory = self.paths.simulation
+        self.assy.save_state(directory=directory, time=self.time, verbose=verbose)
+
+    def load_state(
+        self, directory: str = "", clear_callback: bool = False, verbose: bool = False
+    ) -> None:
+        """
+        Load the rod-state.
+        Compatibale with 'save_state' method.
+
+        If the save-file does not exist, it returns error.
+
+        Parameters
+        ----------
+        directory : Optional[str]
+            Directory path name.
+        """
+        if not directory:
+            directory = self.paths.simulation
+        self.assy.load_state(directory=directory, verbose=verbose)
+
+        # Clear callback
+        if clear_callback:
+            for callback_defaultdict in self.data_rods:
+                callback_defaultdict.clear()
+            if verbose:
+                print("callback cleared")
+
     def render_video(
         self,
         filename_video: str,
         save_folder: str,
-        data_tag: Union[int, str]=0,
+        data_tag: Union[int, str] = 0,
         **kwargs,
     ) -> None:
         """
@@ -360,4 +399,7 @@ class Environment:
         )
 
     def close(self):
+        """
+        Close the simulator.
+        """
         pass
