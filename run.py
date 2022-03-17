@@ -38,7 +38,7 @@ def main():
     env.run(action=action, duration=20.0)
 
     # Post Processing
-    env.post_processing(
+    env.render_video(
         filename_video="br2_simulation",
         save_folder=PATH,
         data_id=0,

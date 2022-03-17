@@ -12,7 +12,8 @@
 
 import os
 import sys
-sys.path.insert(0, os.path.abspath('.'))
+
+sys.path.insert(0, os.path.abspath('../'))
 
 from br2.version import VERSION
 
@@ -79,7 +80,7 @@ html_theme_option = {
     "repository_url": "https://github.com/skim0119/BR2-simulator",
     "use_repository_button": True,
 }
-html_title = "BR2"
+html_title = "BR2-Simulator"
 #html_logo = ""
 
 # Add any paths that contain custom static files (such as style sheets) here,

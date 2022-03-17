@@ -24,7 +24,7 @@ This project is developed privately at this stage.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: API Documentation:
 
    api/simulator
 

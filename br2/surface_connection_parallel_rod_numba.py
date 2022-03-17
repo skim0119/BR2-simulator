@@ -8,12 +8,12 @@ from elastica.utils import Tolerance
 
 # Join the two rods
 from elastica._linalg import _batch_norm, _batch_cross, _batch_matvec, _batch_dot, _batch_matmul, _batch_matrix_transpose
-from elastica._elastica_numba._interaction import (
+from elastica.interaction import (
     elements_to_nodes_inplace,
     node_to_element_pos_or_vel,
 )
 
-from elastica._elastica_numpy._rotations import _inv_skew_symmetrize
+from elastica._rotations import _inv_skew_symmetrize
 
 @njit(cache=True)
 def _single_get_rotation_matrix(theta:float, unit_axis):

@@ -19,12 +19,12 @@ from elastica._linalg import _batch_cross, _batch_dot, _batch_norm, _batch_matve
 from elastica._linalg import _batch_product_i_k_to_ik
 from elastica.restart import save_state, load_state
 
-from surface_connection_parallel_rod_numba import (
+from br2.surface_connection_parallel_rod_numba import (
     SurfaceJointSideBySide,
     TipToTipStraightJoint
 )
 
-from free_custom_systems import (
+from br2.free_custom_systems import (
     FreeBendActuation,
     FreeTwistActuation,
     FreeBaseEndSoftFixed

@@ -4,9 +4,9 @@ from elastica.utils import Tolerance
 
 from elastica._calculus import _clip_array
 from elastica._linalg import _batch_cross, _batch_dot, _batch_norm, _batch_matvec
-from elastica._elastica_numba._linalg import _batch_product_i_k_to_ik
+from elastica._linalg import _batch_product_i_k_to_ik
 
-from surface_connection_parallel_rod_numba import _single_inv_rotate, _single_get_rotation_matrix
+from br2.surface_connection_parallel_rod_numba import _single_inv_rotate, _single_get_rotation_matrix
 
 import numpy as np
 import numba
