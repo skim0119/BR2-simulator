@@ -3,9 +3,9 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-******************************
-BR2 simulator's documentation!
-******************************
+*****************************
+BR2 simulator's documentation
+*****************************
 
 .. badges
 
@@ -19,14 +19,14 @@ This project is developed privately at this stage.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: How To
 
    guide/how_to_set_simulation
    guide/examples
 
 .. toctree::
    :maxdepth: 2
-   :caption: API Documentation:
+   :caption: API
 
    api/simulator
 

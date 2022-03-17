@@ -32,7 +32,7 @@ def main():
     )
 
     # Simulation
-    status = env.run(action=action, duration=20.0, check_nan=True, check_steady_state=True)
+    status = env.run(action=action, duration=1.0, check_nan=True, check_steady_state=True)
     print(status)
 
     # Post Processing
