@@ -21,34 +21,40 @@ from br2.free_simulator import FreeAssembly
 
 @dataclass
 class DataPaths:
+    """
+    Data path collection
+
+        Attributes
+        ----------
+        tag : str
+            Simulation tag that will be appended at the end of the result directory.
+        paths : str
+            Parent directory path
+        simulation : str
+            Path to save the simulation data for pause/restart purpose.
+        renderings : str
+            Path to save all the rendering videos.
+        data : str
+            Path to save data for the post-processing.
+
+    """
+
     tag: str
 
     @property
     def paths(self) -> str:
-        """
-        Parent directory path
-        """
         return f"result_{tag}"
 
     @property
     def simulation(self) -> str:
-        """
-        Path to save the simulation data for pause/restart purpose.
-        """
         return os.path.join(self.paths, "simulation_saves")
 
     @property
     def renderings(self) -> str:
-        """
-        Path to save all the rendering videos.
-        """
         return os.path.join(self.paths, "renderings")
 
     @property
     def data(self) -> str:
-        """
-        Path to save data for the post-processing.
-        """
         return os.path.join(self.paths, "data")
 
     def initialize(self):
@@ -64,16 +70,17 @@ class DataPaths:
 @dataclass
 class TerminalInfo:
     """
-    Attributes
-    ----------
-    end_status : bool
-        Indicate if simulation reached end.
-    <variable>_nan_status : bool
-        Indicate if NaN exists in <variable>. Only given when `check_nan` is True.
-    <variable>_steady_state_status : bool
-        Indicate if <variable> is in steady-state. Only given when `check_steady_state` is given.
-    max_velocity : float
-        Maximum velocity at the end of the run. Only given when `check_steady_state=1`.
+
+        Attributes
+        ----------
+        end_status : bool
+            Indicate if simulation reached end.
+        <variable>_nan_status : bool
+            Indicate if NaN exists in <variable>. Only given when `check_nan` is True.
+        <variable>_steady_state_status : bool
+            Indicate if <variable> is in steady-state. Only given when `check_steady_state` is given.
+        max_velocity : float
+            Maximum velocity at the end of the run. Only given when `check_steady_state=1`.
 
     """
 
@@ -85,7 +92,6 @@ class TerminalInfo:
             if name.endswith("status"):
                 print(f"{name} = {getattr(self, name)}")
 
-    @property
     def combined_nan_status(self) -> bool:
         """
         Combined status for if NaN exists. Return true if any NaN status is true.
@@ -101,7 +107,6 @@ class TerminalInfo:
         ]
         return all(status_list)
 
-    @property
     def combined_steady_state_status(self) -> bool:
         """
         Combined status for steady state. Return true if all steady-state status is true.
