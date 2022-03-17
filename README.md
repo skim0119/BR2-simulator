@@ -12,7 +12,7 @@
 
 Simulator development for BR2 Softrobot using [`PyElastica`](https://github.com/GazzolaLab/PyElastica).
 
-The [documentation](https://br2-simulator.readthedocs.io/en/latest/index.html) includes the detail guide of how to use this package.
+The [documentation](https://br2-simulator.readthedocs.io/en/latest/?badge=latest) includes the detail guide of how to use this package.
 
 ## Configuration
 
