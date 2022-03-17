@@ -60,26 +60,27 @@ class Datapaths:
         os.makedirs(self.renderings, exist_ok1)
         os.makedirs(self.data, exist_ok1)
 
+
 @dataclass
 class TerminalInfo:
     """
-        Attributes
-        ----------
-        end_status : bool
-            Indicate if simulation reached end.
-        <variable>_nan_status : bool
-            Indicate if NaN exists in <variable>. Only given when `check_nan` is True.
-        <variable>_steady_state_status : bool
-            Indicate if <variable> is in steady-state. Only given when `check_steady_state` is given.
-        max_velocity : float
-            Maximum velocity at the end of the run. Only given when `check_steady_state=1`.
+    Attributes
+    ----------
+    end_status : bool
+        Indicate if simulation reached end.
+    <variable>_nan_status : bool
+        Indicate if NaN exists in <variable>. Only given when `check_nan` is True.
+    <variable>_steady_state_status : bool
+        Indicate if <variable> is in steady-state. Only given when `check_steady_state` is given.
+    max_velocity : float
+        Maximum velocity at the end of the run. Only given when `check_steady_state=1`.
 
     """
 
-    end_status:bool = False
+    end_status: bool = False
 
     def __str__(self):
-        """ Print all status """
+        """Print all status"""
         for name in self.__dir__():
             if name.endswith("status"):
                 print(f"{name} = {getattr(self, name)}")
@@ -93,7 +94,11 @@ class TerminalInfo:
         -----
         If check_nan is not given in simulation, this property does not give correct indication.
         """
-        status_list = [name for name in self.__dir__() if name.endswith("status") and "_nan_" in name]
+        status_list = [
+            name
+            for name in self.__dir__()
+            if name.endswith("status") and "_nan_" in name
+        ]
         return all(status_list)
 
     @property
@@ -105,9 +110,12 @@ class TerminalInfo:
         -----
         If check_steady_state is not given in simulation, this property does not give correct indication.
         """
-        status_list = [name for name in self.__dir__() if name.endswith("status") and "_steady_state_" in name]
+        status_list = [
+            name
+            for name in self.__dir__()
+            if name.endswith("status") and "_steady_state_" in name
+        ]
         return any(status_list)
-
 
 
 class Environment:
@@ -232,6 +240,18 @@ class Environment:
         # Set action
         self.assy.set_actuation(action)
 
+        # Record previous-step
+        if check_steady_state == 2:
+            # fmt: off
+            keys = list(self.shearable_rods.keys())
+            prev_position = np.concatenate([self.shearable_rods[name].position_collection for name in keys], axis=-1)
+            prev_velocity = np.concatenate([self.shearable_rods[name].velocity_collection for name in keys], axis=-1)
+            prev_acceleration = np.concatenate([self.shearable_rods[name].acceleration_collection for name in keys], axis=-1)
+            prev_director = np.concatenate([self.shearable_rods[name].director_collection for name in keys], axis=-1)
+            prev_omega = np.concatenate([self.shearable_rods[name].omega_collection for name in keys], axis=-1)
+            prev_alpha = np.concatenate([self.shearable_rods[name].alpha_collection for name in keys], axis=-1)
+            # fmt: on
+
         # Simulation
         time = self.time
         if not duration:
@@ -254,23 +274,16 @@ class Environment:
         # Check steady state
         if check_steady_state == 1:
             # Velocity steady-state test
-            velocities = [np.array(self.shearable_rods[key].position_collection)
-                for key in self.shearable_rods.keys()]
+            velocities = [
+                np.array(self.shearable_rods[key].position_collection)
+                for key in self.shearable_rods.keys()
+            ]
             max_velocity = max([np.linalg.norm(v, axis=0).max() for v in velocities])
             status.velocity_steady_state_status = max_velocity < self.velocity_threshold
             status.max_velocity = max_velocity
         elif check_steady_state == 2:
             # fmt: off
-            keys = list(self.shearable_rods.keys())
-            prev_position = np.concatenate([self.shearable_rods[name].position_collection for name in keys], axis=-1)
-            prev_velocity = np.concatenate([self.shearable_rods[name].velocity_collection for name in keys], axis=-1)
-            prev_acceleration = np.concatenate([self.shearable_rods[name].acceleration_collection for name in keys], axis=-1)
-            prev_director = np.concatenate([self.shearable_rods[name].director_collection for name in keys], axis=-1)
-            prev_omega = np.concatenate([self.shearable_rods[name].omega_collection for name in keys], axis=-1)
-            prev_alpha = np.concatenate([self.shearable_rods[name].alpha_collection for name in keys], axis=-1)
-
             # convergence
-            keys = list(self.shearable_rods.keys())
             position_delta = np.nanmax(
                 np.linalg.norm(prev_position - np.concatenate(
                     [self.shearable_rods[name].position_collection for name in keys],
@@ -301,25 +314,14 @@ class Environment:
                     [self.shearable_rods[name].alpha_collection for name in keys],
                     axis=-1
                 ), axis=0))
-            info["position_delta"] = position_delta
-            info["velocity_delta"] = velocity_delta
-            info["acceleration_delta"] = acceleration_delta
-            info["director_delta"] = director_delta
-            info["omega_delta"] = omega_delta
-            info["alpha_delta"] = alpha_delta
-            criteria = (
-                (position_delta < self.position_threshold)
-                and (velocity_delta < self.velocity_threshold)
-                and (acceleration_delta < self.acceleration_threshold)
-                and (director_delta < self.director_threshold)
-                and (omega_delta < self.omega_threshold)
-                and (alpha_delta < self.alpha_threshold)
-            )
+            # Check steady state status
+            position_steady_state_status = (position_delta < self.position_threshold)
+            velocity_steady_state_status = (velocity_delta < self.velocity_threshold)
+            acceleration_steady_state_status = (acceleration_delta < self.acceleration_threshold)
+            director_steady_state_status = (director_delta < self.director_threshold)
+            omega_steady_state_status = (omega_delta < self.omega_threshold)
+            alpha_steady_state_status = (alpha_delta < self.alpha_threshold)
             # fmt: on
-            if criteria:
-                # print("Steady-state (delta), exiting simulation now")
-                done = True
-                info["done_by_steady_state"] = "delta convergence"
 
         # Check NaN
         if check_nan:
