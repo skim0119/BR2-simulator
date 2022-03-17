@@ -1,4 +1,12 @@
-<div align="center"><h1> BR2 Simulator </h1></div>
+<div align="center">
+<h1> BR2 Simulator </h1>
+
+<img src="https://img.shields.io/badge/Python-3776AB?style=flat&logo=Python&logoColor=white"/>
+<a href='https://br2-simulator.readthedocs.io/en/latest/?badge=latest'>
+    <img src='https://readthedocs.org/projects/br2-simulator/badge/?version=latest' alt='Documentation Status'/>
+</a>
+
+</div>
 
 ----
 
