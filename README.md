@@ -12,6 +12,8 @@
 
 Simulator development for BR2 Softrobot using [`PyElastica`](https://github.com/GazzolaLab/PyElastica).
 
+The [documentation](https://br2-simulator.readthedocs.io/en/latest/index.html) includes the detail guide of how to use this package.
+
 ## Configuration
 
 ### Rod Library
@@ -101,36 +103,9 @@ This procedure includes customized [activation](custom_activation.py) and [const
 The [surface connection implementation](surface_connection_parallel_rod_numba.py) is used throughout the other procedures.
 Different test cases are available, and they will be running using multiprocessing.
 
-### Single FREE Characterization
-
-- run_FREE_bending.py
-    - set_environment_single.py
-        - free_simulator.py
-        - free_actuation.py
-- run_FREE_twist.py
-    - set_environment_single.py
-        - free_simulator.py
-        - free_actuation.py
-- plot_bending_characterization.py
-- plot_twist_characterization.py
-
-This scripts simulate single-rod with increasing activation.
-The result is used to characterize single FREE actuation.
-
-### Simple BR2
-
-- run_br2.py
-    - set_environment_br2.py
-        - free_simulator.py
-        - free_actuation.py
-- run_br2_batch.py
-    - set_environment_br2.py
-        - free_simulator.py
-        - free_actuation.py
-
 ### Interactive BR2
 
-work in progress
+_work in progress_
 
 - run_br2_interactive.py
 

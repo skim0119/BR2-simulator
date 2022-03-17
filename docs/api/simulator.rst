@@ -1,5 +1,5 @@
-Simulator Environment
-=====================
+Environment
+===========
 
 .. automodule::  br2.environment
 
