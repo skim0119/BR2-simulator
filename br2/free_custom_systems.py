@@ -31,7 +31,7 @@ class FreeBendActuation(NoForces):
         self.ramp_up_time = ramp_up_time
 
     ''' (deprecated)
-    def apply_forces(self, system, time: np.float = 0.0):
+    def apply_forces(self, system, time: float = 0.0):
         factor = min(1.0, time / self.ramp_up_time)
         force_on_one_element = self.actuation_ref[0] * factor
         tangents = system.tangents[...]
@@ -43,7 +43,7 @@ class FreeBendActuation(NoForces):
         )
     '''
 
-    def apply_torques(self, system, time: np.float = 0.0):
+    def apply_torques(self, system, time: float = 0.0):
         factor = min(1.0, time / self.ramp_up_time) # Not sure
         torque_mag = self.actuation_ref[0] * self.magnitude_scale # * factor
         local_unit_vector = np.array([np.cos(self.z_angle),
@@ -83,7 +83,7 @@ class FreeTwistActuation(NoForces):
         self.ramp_up_time = ramp_up_time
 
     '''
-    def apply_forces(self, system, time: np.float = 0.0):
+    def apply_forces(self, system, time: float = 0.0):
         factor = min(1.0, time / self.ramp_up_time)
         force_on_one_element = self.torque[0] / 3.14742e-2 * factor # TODO: double check the ratio
         tangents = system.tangents[...]
@@ -95,7 +95,7 @@ class FreeTwistActuation(NoForces):
         )
     '''
 
-    def apply_torques(self, system, time: np.float = 0.0):
+    def apply_torques(self, system, time: float = 0.0):
         #factor = min(1.0, time / self.ramp_up_time)
         torque = self.actuation_ref[0] * self.scale * self.direction #* factor
         n_elems = system.n_elems
