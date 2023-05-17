@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "br2"
+version = "0.1.0"
+description = "Cosserat Rod based FREE assembly simulator"
+authors = ["Seung Hyun Kim <skim0119@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+numpy = "^1.24.3"
+numba = "^0.57.0"
+pyelastica = ">=0.3.1"
+matplotlib = "^3.7.1"
+tqdm = "^4.65.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
