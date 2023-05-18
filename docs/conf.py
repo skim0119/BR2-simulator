@@ -85,7 +85,7 @@ html_theme_options = {
     "use_issues_button": True,
     "use_repository_button": True,
     "use_edit_page_button": True,
-    "logo_only": True
+    #"logo_only": True
 }
 html_css_files = ['custom.css']
 

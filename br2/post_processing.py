@@ -2,10 +2,13 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import to_rgb
+import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import proj3d, Axes3D
 #from tqdm import tqdm
 
 from typing import Dict, Sequence
+
+#plt.rcParams.update({"font.size": 22})
 
 def tqdm(obj): # tqdm suppressor
     return obj
@@ -66,10 +69,6 @@ def plot_video_with_surface(
     vis2D=True,
     **kwargs,
 ):
-    #plt.rcParams.update({"font.size": 22})
-
-    # 2d case <always 2d case for now>
-    import matplotlib.animation as animation
 
     # simulation time
     sim_time = np.array(rods_history[0]["time"])
@@ -77,12 +76,12 @@ def plot_video_with_surface(
     # Rod
     n_visualized_rods = len(rods_history)  # should be one for now
     # Rod info
-    rod_history_unpacker = lambda rod_idx, t_idx: (
-        rods_history[rod_idx]["position"][t_idx],
-        rods_history[rod_idx]["radius"][t_idx],
-    )
+    def rod_history_unpacker(rod_idx, t_idx):
+        return rods_history[rod_idx]["position"][t_idx], rods_history[rod_idx]["radius"][t_idx]
+
     # Rod center of mass
-    com_history_unpacker = lambda rod_idx, t_idx: rods_history[rod_idx]["com"][time_idx]
+    def com_history_unpacker(rod_idx, t_idx):
+        return rods_history[rod_idx]["com"][t_idx]
 
     # video pre-processing
     #print("plot scene visualization video")

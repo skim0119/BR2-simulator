@@ -63,6 +63,8 @@ class FreeCallback(CallBackBaseClass):
         self.callback_params["lengths"].append(system.lengths.copy())
         self.callback_params["dilatation"].append(system.dilatation.copy())
         self.callback_params["radius"].append(system.radius.copy())
+        self.callback_params["com"].append(system.compute_position_center_of_mass())
+        #self.callback_params["vcom"].append(system.compute_velocity_center_of_mass())
 
 
 class FreeAssembly:
@@ -169,7 +171,6 @@ class FreeAssembly:
 
             '''Parallel Connection'''
             print("connecting in parallel...")
-            # TODO: I do not know what these terms are for, conceivably for the coupling of the arms
             outer_radius = rod_spec['outer_radius']
             base_length = rod_spec['base_length']
             E = rod_spec['youngs_modulus']
@@ -279,22 +280,14 @@ class FreeAssembly:
 
         return rod
 
-    def add_alpha_fibers(self, rod, actuation_ref, fiber_angles:list):
+    def add_angled_fibers(self, rod, actuation_ref, fiber_angles:list):
+        scale = np.pi * (rod.inner_radius**3) * ((np.sin(angle)**2) + 2*(np.cos(angle)**2)) / (np.sin(2*angle))
         for alpha in fiber_angles:
             angle = alpha * np.pi / 180
-            scale = np.pi * (rod.inner_radius**3) * ((np.sin(angle)**2) + 2*(np.cos(angle)**2)) / (np.sin(2*angle))
             self.simulator.add_forcing_to(rod).using(
                 FreeTwistActuation,
                 actuation_ref,
                 scale=scale
-            )
-
-    def add_beta_fibers(self, rod, actuation_ref, fiber_angles: list):
-        for beta in fiber_angles:
-            self.simulator.add_forcing_to(rod).using(
-                FreeTwistActuation,
-                actuation_ref,
-                scale=beta * np.pi / 180
             )
 
     def add_straight_fibers(self, rod, actuation_ref, fiber_angles: list):
@@ -314,8 +307,8 @@ class FreeAssembly:
 
         # Add fiber
         if actuation_ref is not None:
-            self.add_alpha_fibers(rod, actuation_ref, alpha)
-            self.add_beta_fibers(rod, actuation_ref, beta)
+            self.add_angled_fibers(rod, actuation_ref, alpha)
+            self.add_angled_fibers(rod, actuation_ref, beta)
             self.add_straight_fibers(rod, actuation_ref, gamma)
 
         return rod

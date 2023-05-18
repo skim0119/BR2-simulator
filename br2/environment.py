@@ -3,6 +3,7 @@ from typing import Optional, Union
 import os
 import copy
 import time
+import logging
 
 from dataclasses import dataclass
 
@@ -266,7 +267,8 @@ class Environment:
         if not duration:
             duration = self.time_step
         with tqdm(
-            total=self.time + duration, mininterval=0.5, disable=disable_progress_bar
+            total=self.time + duration, mininterval=0.5, disable=disable_progress_bar,
+            bar_format = "{desc}: {percentage:.3f}%|{bar}| {n:.5f}/{total_fmt} [{elapsed}<{remaining}"
         ) as pbar:
             while time < self.time + duration:
                 time = self.do_step(
@@ -394,6 +396,10 @@ class Environment:
 
         filename_video = "br2_simulation"
         save_folder = self.paths.renderings
+        if not os.path.exists(save_folder):
+            os.makedirs(save_folder)
+        else:
+            logging.warning("The folder already exists. The data will be overwritten.")
 
         plot_video_with_surface(
             self.data_rods,
@@ -404,8 +410,7 @@ class Environment:
             **kwargs,
         )
 
-        position_data_path = os.path.join(save_folder, f"br2_data_{data_tag}.npz")
-        self.save_data(position_data_path)
+        self.save_data("position")
 
     def save_data(self, tag:Optional[str]=None) -> None:
         """save_data.

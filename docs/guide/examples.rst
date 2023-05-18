@@ -4,5 +4,5 @@ Code Examples
 Workflow Example
 ~~~~~~~~~~~~~~~~
 
-.. include:: ../../run.py
+.. include:: ../../examples/run.py
    :code: python
