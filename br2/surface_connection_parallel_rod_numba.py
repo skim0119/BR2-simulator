@@ -10,7 +10,8 @@ from elastica.utils import Tolerance
 from elastica._linalg import _batch_norm, _batch_cross, _batch_matvec, _batch_dot, _batch_matmul, _batch_matrix_transpose
 from elastica.interaction import (
     elements_to_nodes_inplace,
-    node_to_element_pos_or_vel,
+    node_to_element_position,
+    node_to_element_velocity,
 )
 
 from elastica._rotations import _inv_skew_symmetrize
@@ -135,6 +136,8 @@ class SurfaceJointSideBySide(FreeJoint):
         self.rod_one_rd2, self.rod_two_rd2, self.spring_force = self._apply_forces(
             self.k,
             self.nu,
+            rod_one.mass,
+            rod_two.mass,
             self.rd1_local,
             self.rd2_local,
             rod_one.position_collection,
@@ -156,6 +159,8 @@ class SurfaceJointSideBySide(FreeJoint):
     def _apply_forces(
         k,
         nu,
+        rod_one_mass,
+        rod_two_mass,
 		rod_one_rd2_local,
 		rod_two_rd2_local,
         rod_one_position_collection,
@@ -172,10 +177,10 @@ class SurfaceJointSideBySide(FreeJoint):
         rod_two_external_forces,
     ):
         # Compute element positions
-        rod_one_element_position = node_to_element_pos_or_vel(
+        rod_one_element_position = node_to_element_position(
             rod_one_position_collection
         )
-        rod_two_element_position = node_to_element_pos_or_vel(
+        rod_two_element_position = node_to_element_position(
             rod_two_position_collection
         )
 
@@ -197,10 +202,12 @@ class SurfaceJointSideBySide(FreeJoint):
         spring_force = k * (distance_vector)
 
         # Damping force
-        rod_one_element_velocity = node_to_element_pos_or_vel(
+        rod_one_element_velocity = node_to_element_velocity(
+            rod_one_mass,
             rod_one_velocity_collection
         )
-        rod_two_element_velocity = node_to_element_pos_or_vel(
+        rod_two_element_velocity = node_to_element_velocity(
+            rod_two_mass,
             rod_two_velocity_collection
         )
 

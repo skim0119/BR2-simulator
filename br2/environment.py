@@ -198,7 +198,7 @@ class Environment:
             assembly_config_path
         ), "Assembly configuration does not exists."
 
-        self.assy = FreeAssembly(**kwargs)
+        self.assy = FreeAssembly(self, **kwargs)
 
         """rod name -> [seg,rod]"""
         self.shearable_rods = self.assy.build(rod_database_path, assembly_config_path)
@@ -266,14 +266,14 @@ class Environment:
         if not duration:
             duration = self.time_step
         with tqdm(
-            total=duration, mininterval=0.5, disable=disable_progress_bar
+            total=self.time + duration, mininterval=0.5, disable=disable_progress_bar
         ) as pbar:
             while time < self.time + duration:
                 time = self.do_step(
                     self.StatefulStepper,
                     self.stages_and_updates,
                     self.simulator,
-                    self.time,
+                    time,
                     self.time_step,
                 )
                 pbar.update(self.time_step)

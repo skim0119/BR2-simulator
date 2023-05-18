@@ -33,7 +33,7 @@ from br2.free_custom_systems import (
 
 
 # Set base elastica simulator class
-class BR2Simulator(BaseSystemCollection, Constraints, Connections, Forcing, CallBacks):
+class BR2Simulator(BaseSystemCollection, Constraints, Connections, Forcing, Damping, CallBacks):
     pass
 
 
@@ -66,7 +66,9 @@ class FreeCallback(CallBackBaseClass):
 
 
 class FreeAssembly:
-    def __init__(self, gravity=False, **kwargs):
+    def __init__(self, env, gravity=False, **kwargs):
+        self.env = env
+
         self.simulator = BR2Simulator()
         self.actuation = defaultdict(list)
         self.free = {}  # Key: <segment name>_<order>_<rod name>
@@ -251,6 +253,15 @@ class FreeAssembly:
 
         # Append rod to simulator
         self.simulator.append(rod)
+
+        # add damping
+        if "damping_constant" in rod_spec:
+            damping_constant = rod_spec["damping_constant"]
+            self.simulator.dampen(rod).using(
+                AnalyticalLinearDamper,
+                damping_constant=damping_constant,
+                time_step=self.env.time_step,
+            )
 
         # Constrain one end of the rod (TODO : Modify for serial connection)
         if is_first_segment:

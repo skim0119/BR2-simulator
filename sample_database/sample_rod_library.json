@@ -1,16 +1,16 @@
 { 
     "Info": "Example set of BR2 properties",
     "DefaultParams": {
-        "n_elements"     : 41,
-        "direction"      : [0.0,1.0,0.0],
-        "normal"         : [0.0,0.0,1.0],
-        "base_length"    : 0.18,
-        "outer_radius"   : 0.007522,
-        "inner_radius"   : 0.006522,
-        "density"        : 1500,
-        "nu"             : 0.089178,
-        "youngs_modulus" : 1.00e7,
-        "shear_modulus"  : 6.66e6 
+        "n_elements"       : 41,
+        "direction"        : [0.0,1.0,0.0],
+        "normal"           : [0.0,0.0,1.0],
+        "base_length"      : 0.18,
+        "outer_radius"     : 0.007522,
+        "inner_radius"     : 0.006522,
+        "density"          : 1500,
+        "damping_constant" : 0.1,
+        "youngs_modulus"   : 1.00e7,
+        "shear_modulus"    : 6.66e6
     },
     "Rods": {
         "RodBend": {
