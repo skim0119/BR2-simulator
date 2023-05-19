@@ -17,7 +17,7 @@ from numba import njit
 class FreeBendActuation(NoForces):
     # TODO
 
-    def __init__(self, actuation_ref, z_angle, scale, ramp_up_time=1.0):
+    def __init__(self, actuation_ref, z_angle, scale, ramp_up_time=0.2):
         super(FreeBendActuation, self).__init__()
         self.actuation_ref = actuation_ref
         self.z_angle = z_angle
@@ -44,8 +44,8 @@ class FreeBendActuation(NoForces):
     '''
 
     def apply_torques(self, system, time: float = 0.0):
-        factor = min(1.0, time / self.ramp_up_time) # Not sure
-        torque_mag = self.actuation_ref[0] * self.magnitude_scale # * factor
+        factor = min(1.0, time / self.ramp_up_time)
+        torque_mag = self.actuation_ref[0] * self.magnitude_scale * factor
         local_unit_vector = np.array([np.cos(self.z_angle),
                                       np.sin(self.z_angle),
                                       0.0
@@ -68,7 +68,7 @@ class FreeBendActuation(NoForces):
 class FreeTwistActuation(NoForces):
     # TODO
 
-    def __init__(self, actuation_ref, scale, ramp_up_time=1.0):
+    def __init__(self, actuation_ref, scale, ramp_up_time=0.2):
         """
 
         Parameters
@@ -96,18 +96,13 @@ class FreeTwistActuation(NoForces):
     '''
 
     def apply_torques(self, system, time: float = 0.0):
-        #factor = min(1.0, time / self.ramp_up_time)
-        torque = self.actuation_ref[0] * self.scale * self.direction #* factor
+        factor = min(1.0, time / self.ramp_up_time)
+        torque = self.actuation_ref[0] * self.scale * self.direction * factor
         n_elems = system.n_elems
         torques = (
             _batch_product_i_k_to_ik(torque, np.ones((n_elems))) / n_elems
         )
         system.external_torques += torques
-        '''
-        system.external_torques += _batch_matvec(
-            system.director_collection, torque_on_one_element
-        )
-        '''
 
 class FreeBaseEndSoftFixed(ConstraintBase):
 
@@ -132,7 +127,6 @@ class FreeBaseEndSoftFixed(ConstraintBase):
 
     def constrain_values(self, rod, time):
         super().constrain_values(rod, time)
-        #rod.position_collection[...,0] = self.fixed_position
         self.restrict_position(
             rod.position_collection[...,0],
             self.fixed_position,
