@@ -34,8 +34,7 @@ rendering_fps = 20
 step_skip = int(1.0 / (15*rendering_fps * time_step))
 
 # Rod parameters
-n_elem_rod_one = 50
-n_elem_rod_two = 50
+n_elem_rod = 50
 base_length = 0.5
 base_radius = 0.01
 base_area = np.pi * base_radius ** 2
@@ -48,6 +47,7 @@ shear_modulus = E / (poisson_ratio + 1.0)
 # Rod orientations
 start_one = np.zeros(3,)
 start_two = np.array((0.02,0,0))
+start_three = np.array((0.04,0,0))
 inclination = np.deg2rad(0)
 direction = np.array([0.0, np.cos(inclination), np.sin(inclination)])
 normal = np.array([0.0, -np.sin(inclination), np.cos(inclination)])
@@ -59,7 +59,7 @@ nu = 10 #粘性阻尼系数
 kt = 1e3 #旋转刚度或者旋转弹性系数
 
 rod_one = ea.CosseratRod.straight_rod(
-    n_elem_rod_one,
+    n_elem_rod,
     start_one,
     direction,
     normal,
@@ -73,7 +73,7 @@ rod_one = ea.CosseratRod.straight_rod(
 Parallel_rod_rod_connect_sim.append(rod_one)
 
 rod_two = ea.CosseratRod.straight_rod(
-    n_elem_rod_two,
+    n_elem_rod,
     start_two,
     direction,
     normal,
@@ -86,8 +86,23 @@ rod_two = ea.CosseratRod.straight_rod(
 
 Parallel_rod_rod_connect_sim.append(rod_two)
 
+rod_three = ea.CosseratRod.straight_rod(
+    n_elem_rod,
+    start_three,
+    direction,
+    normal,
+    base_length,
+    base_radius,
+    density,
+    youngs_modulus=E,
+    shear_modulus=shear_modulus,
+)
+
+Parallel_rod_rod_connect_sim.append(rod_three)
+
 #glue this two rods parallely
 glue_rods_surface_connection(Parallel_rod_rod_connect_sim,rod_one,rod_two,k,nu,kt)
+glue_rods_surface_connection(Parallel_rod_rod_connect_sim,rod_two,rod_three,k,nu,kt)
 
 # add damping
 damping_constant = 5000
@@ -101,12 +116,20 @@ Parallel_rod_rod_connect_sim.dampen(rod_two).using(
     damping_constant=damping_constant,
     time_step=dt,
 )
+Parallel_rod_rod_connect_sim.dampen(rod_three).using(
+    ea.AnalyticalLinearDamper,
+    damping_constant=damping_constant,
+    time_step=dt,
+)
 
 # add constrain
 Parallel_rod_rod_connect_sim.constrain(rod_one).using(
     OneEndFixedRod, constrained_position_idx=(0,), constrained_director_idx=(0,)#这里的idx是索引的意思
 )
 Parallel_rod_rod_connect_sim.constrain(rod_two).using(
+    OneEndFixedRod, constrained_position_idx=(0,), constrained_director_idx=(0,)#这里的idx是索引的意思
+)
+Parallel_rod_rod_connect_sim.constrain(rod_three).using(
     OneEndFixedRod, constrained_position_idx=(0,), constrained_director_idx=(0,)#这里的idx是索引的意思
 )
 
@@ -121,9 +144,9 @@ Parallel_rod_rod_connect_sim.add_forcing_to(rod_one).using(
 Parallel_rod_rod_connect_sim.add_forcing_to(rod_two).using(
     ea.EndpointForces, origin_force, end_force, ramp_up_time=ramp_up_time
 )
-# Parallel_rod_rod_connect_sim.add_forcing_to(rod_three).using(
-#     EndpointForces, origin_force, end_force, ramp_up_time=ramp_up_time
-# )
+Parallel_rod_rod_connect_sim.add_forcing_to(rod_three).using(
+    EndpointForces, origin_force, end_force, ramp_up_time=ramp_up_time
+)
         
 
 # Add call backs
@@ -164,6 +187,16 @@ Parallel_rod_rod_connect_sim.collect_diagnostics(rod_two).using(
     callback_params=post_processing_dict_rod2,
 )
 
+post_processing_dict_rod3 = ea.defaultdict(
+    list
+)  # list which collected data will be append
+# set the diagnostics for rod and collect data
+Parallel_rod_rod_connect_sim.collect_diagnostics(rod_three).using(
+    GJMCallBack,
+    step_skip=step_skip,
+    callback_params=post_processing_dict_rod3,
+)
+
 
 Parallel_rod_rod_connect_sim.finalize()
 
@@ -174,7 +207,7 @@ ea.integrate(timestepper, Parallel_rod_rod_connect_sim, final_time, total_steps)
 #plotting videos
 filename_video = 'surfacejoinFaceByFace_1_26'
 plot_video(
-    [post_processing_dict_rod1, post_processing_dict_rod2],
+    [post_processing_dict_rod1, post_processing_dict_rod2, post_processing_dict_rod3],
     video_name="3d_" + filename_video + ".mp4",
     fps=50,
     step=1,
