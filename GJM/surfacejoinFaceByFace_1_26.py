@@ -10,7 +10,7 @@ from elastica.boundary_conditions import OneEndFixedRod, FreeRod
 from elastica.external_forces import EndpointForces
 
 #plot video
-from plot_video_GJM import plot_video_2D, plot_video
+from plot_video_GJM import plot_video
 
 class ParallelRodRodConnect(
     ea.BaseSystemCollection,
@@ -18,6 +18,7 @@ class ParallelRodRodConnect(
     ea.Connections,
     ea.Forcing,
     ea.Damping,
+    ea.CallBacks,
 ):
     pass
 
@@ -30,7 +31,7 @@ final_time = 1
 total_steps = int(final_time / dt)
 time_step = np.float64(final_time / total_steps)
 rendering_fps = 20
-step_skip = int(1.0 / (rendering_fps * time_step))
+step_skip = int(1.0 / (15*rendering_fps * time_step))
 
 # Rod parameters
 n_elem_rod_one = 50
@@ -40,7 +41,7 @@ base_radius = 0.01
 base_area = np.pi * base_radius ** 2
 density = 1750
 nu = 0.0
-E = 3e5
+E = 1e6
 poisson_ratio = 0.5
 shear_modulus = E / (poisson_ratio + 1.0)
 
@@ -85,8 +86,11 @@ rod_two = ea.CosseratRod.straight_rod(
 
 Parallel_rod_rod_connect_sim.append(rod_two)
 
+#glue this two rods parallely
+glue_rods_surface_connection(Parallel_rod_rod_connect_sim,rod_one,rod_two,k,nu,kt)
+
 # add damping
-damping_constant = 2e-4
+damping_constant = 5000
 Parallel_rod_rod_connect_sim.dampen(rod_one).using(
     ea.AnalyticalLinearDamper,
     damping_constant=damping_constant,
@@ -106,10 +110,76 @@ Parallel_rod_rod_connect_sim.constrain(rod_two).using(
     OneEndFixedRod, constrained_position_idx=(0,), constrained_director_idx=(0,)#这里的idx是索引的意思
 )
 
-glue_rods_surface_connection(Parallel_rod_rod_connect_sim,rod_one,rod_two,k,nu,kt)
+#add forces
+# try to add forces to simulator
+origin_force = np.array([0.0, 0.0, 0.0])
+end_force = np.array([0.0, 0.0, 1000.0])
+ramp_up_time = 1.0
+Parallel_rod_rod_connect_sim.add_forcing_to(rod_one).using(
+    ea.EndpointForces, origin_force, end_force, ramp_up_time=ramp_up_time
+)
+Parallel_rod_rod_connect_sim.add_forcing_to(rod_two).using(
+    ea.EndpointForces, origin_force, end_force, ramp_up_time=ramp_up_time
+)
+# Parallel_rod_rod_connect_sim.add_forcing_to(rod_three).using(
+#     EndpointForces, origin_force, end_force, ramp_up_time=ramp_up_time
+# )
         
+
+# Add call backs
+class GJMCallBack(CallBackBaseClass):
+    def __init__(self, step_skip: int, callback_params: dict):
+        CallBackBaseClass.__init__(self)
+        self.every = step_skip
+        self.callback_params = callback_params
+
+    def make_callback(self, system, time, current_step: int):
+
+        if current_step % self.every == 0:
+
+            self.callback_params["time"].append(time)
+            # Collect x
+            self.callback_params["position"].append(system.position_collection.copy())
+            # Collect radius
+            self.callback_params["radius"].append(system.radius.copy())
+            return
+
+post_processing_dict_rod1 = ea.defaultdict(
+    list
+)  # list which collected data will be append
+# set the diagnostics for rod and collect data
+Parallel_rod_rod_connect_sim.collect_diagnostics(rod_one).using(
+    GJMCallBack,
+    step_skip=step_skip,
+    callback_params=post_processing_dict_rod1,
+)
+
+post_processing_dict_rod2 = ea.defaultdict(
+    list
+)  # list which collected data will be append
+# set the diagnostics for rod and collect data
+Parallel_rod_rod_connect_sim.collect_diagnostics(rod_two).using(
+    GJMCallBack,
+    step_skip=step_skip,
+    callback_params=post_processing_dict_rod2,
+)
+
+
 Parallel_rod_rod_connect_sim.finalize()
 
 #start simulation
 timestepper = ea.PositionVerlet()
 ea.integrate(timestepper, Parallel_rod_rod_connect_sim, final_time, total_steps)
+
+#plotting videos
+filename_video = 'surfacejoinFaceByFace_1_26'
+plot_video(
+    [post_processing_dict_rod1, post_processing_dict_rod2],
+    video_name="3d_" + filename_video + ".mp4",
+    fps=50,
+    step=1,
+    x_limits=(-0.2, 0.2),
+    y_limits=(-0.2, 0.2),
+    z_limits=(0, 0.5),
+    dpi=100,
+)
