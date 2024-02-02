@@ -273,10 +273,13 @@ def plot_video(
         )
 
     # ax.set_aspect("equal")
+    title_name = kwargs.get("title", 'title')
 
     with writer.saving(fig, video_name, dpi):
         with plt.style.context('seaborn-v0_8-white'):
             for time_idx in tqdm(range(0, sim_time.shape[0], int(step))):
+                current_time = sim_time[time_idx]
+                ax.set_title(f"{title_name}   Simulation Time: {current_time:.2f} seconds")  # Update title with current simulation time
 
                 for rod_idx in range(n_visualized_rods):
                     inst_position, inst_radius = rod_history_unpacker(rod_idx, time_idx)

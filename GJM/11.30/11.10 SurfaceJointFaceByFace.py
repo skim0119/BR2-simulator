@@ -35,8 +35,8 @@ kt = 1e3 #旋转刚度或者旋转弹性系数
 rod_one_spec = {
     'n_elements' : 40,
     'start' : np.zeros((3,)),
-    'direction' : np.array([0.0,0.0,1.0]), #Q matrix
-    'normal' : np.array([0.0,1.0,0.0]), #法向量
+    'direction' : np.array([0.0,1.0,0.0]), #Q matrix
+    'normal' : np.array([0.0,0.0,1.0]), #法向量
     'base_length' : 0.15,
     'base_radius' : 0.005,
     'density' : 1000,
@@ -50,8 +50,8 @@ rod_one_spec = {
 rod_two_spec = {
     'n_elements' : 40,
     'start' : np.array([0.01,0,0]),
-    'direction' : np.array([0.0,0.0,1.0]),
-    'normal' : np.array([0.0,1.0,0.0]),
+    'direction' : np.array([0.0,1.0,0.0]),
+    'normal' : np.array([0.0,0.0,1.0]),
     'base_length' : 0.15,
     'base_radius' : 0.005,
     'density' : 1000,
@@ -65,8 +65,8 @@ rod_two_spec = {
 rod_three_spec = {
     'n_elements' : 40,
     'start' : np.array([0.02,0,0]),
-    'direction' : np.array([0.0,0.0,1.0]),
-    'normal' : np.array([0.0,1.0,0.0]),
+    'direction' : np.array([0.0,1.0,0.0]),
+    'normal' : np.array([0.0,0.0,1.0]),
     'base_length' : 0.15,
     'base_radius' : 0.005,
     'density' : 1000,
@@ -128,7 +128,7 @@ simulator.constrain(rod_three).using(
 
 # try to add forces to simulator
 origin_force = np.array([0.0, 0.0, 0.0])
-end_force = np.array([0.0, 0.15, 0.0])
+end_force = np.array([0.0, 0.0, 0.15])
 ramp_up_time = 1.0
 simulator.add_forcing_to(rod_one).using(
     EndpointForces, origin_force, end_force, ramp_up_time=ramp_up_time
@@ -186,9 +186,9 @@ n_steps = int(final_time / dt)
 integrate(time_steps,simulator,final_time,n_steps)#n_steps是总步数
 
 
-#def plot_video_2D
 #making vedio
 filename_video = 'threerods_SurfaceJointSidebySide'
+title_name = 'SurfacejoinFaceByFace_11_30'
 plot_video(
     [recorded_history_one, recorded_history_two, recorded_history_three],
     video_name="3d_" + filename_video + ".mp4",
@@ -196,8 +196,9 @@ plot_video(
     step=1,
     x_limits=(-0.2, 0.2),
     y_limits=(-0.2, 0.2),
-    z_limits=(0, 0.2),
+    z_limits=(0, 0.15),
     dpi=100,
+    title=title_name,
 )
 
 

@@ -206,6 +206,7 @@ ea.integrate(timestepper, Parallel_rod_rod_connect_sim, final_time, total_steps)
 
 #plotting videos
 filename_video = 'surfacejoinFaceByFace_1_26'
+title_name = 'surfacejoinFaceByFace_1_26'
 plot_video(
     [post_processing_dict_rod1, post_processing_dict_rod2, post_processing_dict_rod3],
     video_name="3d_" + filename_video + ".mp4",
@@ -215,4 +216,5 @@ plot_video(
     y_limits=(-0.2, 0.2),
     z_limits=(0, 0.5),
     dpi=100,
+    title = title_name,
 )
