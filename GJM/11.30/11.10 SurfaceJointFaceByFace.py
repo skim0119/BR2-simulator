@@ -26,7 +26,7 @@ from elastica._rotations import _inv_skew_symmetrize
 #try to add a streching force to an SurfaceJointSideBySide soft arm
 #not sure which value should I put
 k = 1e3 #弹性系数或者刚度
-nu = 10 #粘性阻尼系数
+nu = 1000 #粘性阻尼系数
 kt = 1e3 #旋转刚度或者旋转弹性系数
 # rd1_local = 5
 # rd2_local = 5
@@ -44,7 +44,7 @@ rod_one_spec = {
     'youngs_modulus' : 1e6,
     'outer_radius' : 0.005,
     'inner_radius' : 0.002,
-    'damping_constant' : 100
+    'damping_constant' : 10000
            }
 
 rod_two_spec = {
@@ -59,12 +59,13 @@ rod_two_spec = {
     'youngs_modulus' : 1e6,
     'outer_radius' : 0.005,#现在暂时没用
     'inner_radius' : 0.002,
-    'damping_constant' : 100
+    'damping_constant' : 10000
            }
 
+z = np.sqrt(3)*0.005
 rod_three_spec = {
     'n_elements' : 40,
-    'start' : np.array([0.02,0,0]),
+    'start' : np.array([0.005,0,z]),
     'direction' : np.array([0.0,1.0,0.0]),
     'normal' : np.array([0.0,0.0,1.0]),
     'base_length' : 0.15,
@@ -74,10 +75,10 @@ rod_three_spec = {
     'youngs_modulus' : 1e6,
     'outer_radius' : 0.005,#现在暂时没用
     'inner_radius' : 0.002,
-    'damping_constant' : 100
+    'damping_constant' : 10000
            }
 
-time_step = 1e-4
+time_step = 1e-5
 class Environment:
     def __init__(self,time_step):
         self.time_step = time_step
@@ -112,6 +113,7 @@ simulator.append(rod_three)
 #ablation test
 assembly.glue_rods_surface_connection(rod_one,rod_two,k,nu,kt)#这两根rods依旧是分开的，所以仍旧需要对两根都施加力，同时用callback
 assembly.glue_rods_surface_connection(rod_two,rod_three,k,nu,kt)#这两根rods依旧是分开的，所以仍旧需要对两根都施加力，同时用callback
+assembly.glue_rods_surface_connection(rod_one,rod_three,k,nu,kt)
 
 #11.10GJM
 #try to add BC to simulator
@@ -128,7 +130,7 @@ simulator.constrain(rod_three).using(
 
 # try to add forces to simulator
 origin_force = np.array([0.0, 0.0, 0.0])
-end_force = np.array([0.0, 0.0, 0.15])
+end_force = np.array([0.0, 0.0, 0.0])
 ramp_up_time = 1.0
 simulator.add_forcing_to(rod_one).using(
     EndpointForces, origin_force, end_force, ramp_up_time=ramp_up_time
@@ -181,7 +183,7 @@ simulator.finalize()
 final_time = 1 #仿真时间10s
 time_steps = PositionVerlet()
 dl = rod_one_spec['base_length'] / rod_one_spec['n_elements']
-dt = 1e-4
+dt = 1e-5
 n_steps = int(final_time / dt)
 integrate(time_steps,simulator,final_time,n_steps)#n_steps是总步数
 
@@ -193,7 +195,7 @@ plot_video(
     [recorded_history_one, recorded_history_two, recorded_history_three],
     video_name="3d_" + filename_video + ".mp4",
     fps=50,
-    step=1,
+    step=10,
     x_limits=(-0.2, 0.2),
     y_limits=(-0.2, 0.2),
     z_limits=(0, 0.15),
