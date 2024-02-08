@@ -3,10 +3,10 @@ import sys
 
 # sys.settrace
 sys.path.append('f:\\Soft_arm\\Code_br2\\BR2-simulator')
-print(sys.path)
+# print(sys.path)
 
 import br2
-print(br2.__file__)
+# print(br2.__file__)
 
 import numpy as np
 

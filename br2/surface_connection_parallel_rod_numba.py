@@ -5,6 +5,7 @@ import numba
 from numba import njit
 from elastica.joint import FreeJoint
 from elastica.utils import Tolerance
+from GJM.count_distance import Count_Distance
 
 # Join the two rods
 from elastica._linalg import _batch_norm, _batch_cross, _batch_matvec, _batch_dot, _batch_matmul, _batch_matrix_transpose
@@ -133,7 +134,7 @@ class SurfaceJointSideBySide(FreeJoint):
     def apply_forces(self, rod_one, index_one, rod_two, index_two):
         # TODO: documentation
 
-        self.rod_one_rd2, self.rod_two_rd2, self.spring_force = self._apply_forces(
+        self.rod_one_rd2, self.rod_two_rd2, self.spring_force, distance = self._apply_forces(
             self.k,
             self.nu,
             rod_one.mass,
@@ -153,6 +154,8 @@ class SurfaceJointSideBySide(FreeJoint):
             rod_one.external_forces,
             rod_two.external_forces,
         )
+        
+        # Count_Distance(distance)
 
     @staticmethod
     @njit(cache=True)
@@ -235,7 +238,7 @@ class SurfaceJointSideBySide(FreeJoint):
         elements_to_nodes_inplace(total_force, rod_one_external_forces)
         elements_to_nodes_inplace(-total_force, rod_two_external_forces)
 
-        return rod_one_rd2, rod_two_rd2, total_force
+        return rod_one_rd2, rod_two_rd2, total_force, distance
 
     def apply_torques(self, rod_one, index_one, rod_two, index_two):
         if self._flag_initialize_To:
