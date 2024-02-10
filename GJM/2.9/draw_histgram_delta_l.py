@@ -1,44 +1,54 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def Print_Histgram(data):
+def print_histgram(data):
+    out_radius = 0.007522
+    
     data = data.reshape(-1,)
+    x = data / out_radius
     
     plt.figure()
     
-    plt.hist(data, bins=30, alpha=0.5, edgecolor='black',density=True)
+    plt.hist(x, bins=30, alpha=0.5, edgecolor='black')
 
-    plt.title('Histogram of delta L')  # 设置标题
-    plt.xlabel('delta L')  # 设置X轴标签
-    plt.ylabel('Frequency')  # 设置Y轴标签
+    plt.title('Histogram of delta L')  
+    plt.xlabel('delta_L/R (R is the out_radius)')  
+    plt.ylabel('Count')  
+    plt.axvline(x=0.3, color='r', linestyle='--')
+    
+    plt.text(0.295, 2.6e6, '0.3',color='red', fontsize=14, verticalalignment='bottom', horizontalalignment='right')
 
 
     
-def Print_deltaL_3d(data):
-    n_elem = data.shape[1]
-    length = np.linspace(0,1,n_elem)
-    time_steps = np.arange(data.shape[0])
+def print_deltaL_3d(data):
+    out_radius = 0.007522
+    time = 1
+    
+    length_elem = data.shape[1]
+    length = np.linspace(0,1,length_elem)
+    time_steps = np.linspace(0,1000*time,data.shape[0])
+
     
     # define data on X,Y plane
-    X,Y = np.meshgrid(length, time_steps)
-    Z = data
+    x,y = np.meshgrid(length, time_steps)
+    z = data / out_radius
     
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     
-    surf = ax.plot_surface(X,Y,Z,cmap='viridis')# viridis define the color
+    surf = ax.plot_surface(x,y,z,cmap='viridis')# viridis define the color
     
     ax.set_xlabel('L')
-    ax.set_ylabel('time')
-    ax.set_zlabel('delta_L')
+    ax.set_ylabel('time (ms)')
+    ax.set_zlabel('delta_L/R (R is the out_radius)')
     
 
     
 
 def main():
     data = np.loadtxt('F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.9\\Disatance_Record.txt')
-    Print_Histgram(data)
-    Print_deltaL_3d(data)
+    print_histgram(data)
+    print_deltaL_3d(data)
     plt.show()
     
     
