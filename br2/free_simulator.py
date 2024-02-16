@@ -79,7 +79,7 @@ class FreeAssembly:
         self.toggle_gravity = gravity
 
         ## Debut
-        self.k_multiplier = kwargs.get('t_multiplier', 1) #* 1.0e-2
+        self.k_multiplier = kwargs.get('k_multiplier', 1) #* 1.0e-2
         self.nu_multiplier = kwargs.get('nu_multiplier', 1) * 1.0e-3
         self.kt_multiplier = kwargs.get('kt_multiplier', 1) #* 0.0 #1e0
 
@@ -283,7 +283,7 @@ class FreeAssembly:
     def add_angled_fibers(self, rod, actuation_ref, fiber_angles:list):
         for alpha in fiber_angles:
             angle = alpha * np.pi / 180
-            scale = np.pi * (rod.inner_radius**3) * ((np.sin(angle)**2) + 2*(np.cos(angle)**2)) / (np.sin(2*angle))
+            scale = 3*(np.pi * (rod.inner_radius**3) * ((np.sin(angle)**2) + 2*(np.cos(angle)**2)) / (np.sin(2*angle)))
             self.simulator.add_forcing_to(rod).using(
                 FreeTwistActuation,
                 actuation_ref,
