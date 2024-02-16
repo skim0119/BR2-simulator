@@ -425,12 +425,31 @@ class Environment:
         else:
             filename = f"br2_data_{tag}.npz"
         path = os.path.join(self.paths.data, filename)
-        position_rod = np.array(self.data_rods[0]["position"])
-        position_rod = 0.5 * (position_rod[..., 1:] + position_rod[..., :-1])
+        
+        director_rod_0 = np.array(self.data_rods[0]["director"])
+        
+        position_rod_0 = np.array(self.data_rods[0]["position"])
+        position_rod_0 = 0.5 * (position_rod_0[..., 1:] + position_rod_0[..., :-1])
+        
+        position_rod_1 = np.array(self.data_rods[1]["position"])
+        position_rod_1 = 0.5 * (position_rod_1[..., 1:] + position_rod_1[..., :-1])
+        
+        position_rod_2 = np.array(self.data_rods[2]["position"])
+        position_rod_2 = 0.5 * (position_rod_2[..., 1:] + position_rod_2[..., :-1])
+        
+        # external_force_rod_0 = self.data_rods[0]["external_forces"]
+        # external_force_rod_1 = self.data_rods[1]["external_forces"]
+        # external_force_rod_2 = self.data_rods[2]["external_forces"]
         np.savez(
             path,
             time=np.array(self.data_rods[0]["time"]),
-            position_rod=position_rod,
+            director_rod_0=director_rod_0,
+            position_rod_0=position_rod_0[:,:,-1],#just record the tip position
+            # position_rod_1=position_rod_1[:,:,-1],
+            # position_rod_2=position_rod_2[:,:,-1],
+            # external_force_rod_0=external_force_rod_0,
+            # external_force_rod_1=external_force_rod_1,
+            # external_force_rod_2=external_force_rod_2,
         )
 
     def close(self):

@@ -238,6 +238,9 @@ def plot_video_with_surface(
         with writer.saving(fig, video_name_3D, dpi):
             with plt.style.context("seaborn-v0_8-whitegrid"):
                 for time_idx in tqdm(range(0, sim_time.shape[0], int(step))):
+                    
+                    current_time = sim_time[time_idx]
+                    ax.set_title(f"Simulation Time: {current_time:.2f} seconds")
 
                     for rod_idx in range(n_visualized_rods):
                         inst_position, inst_radius = rod_history_unpacker(
@@ -300,6 +303,9 @@ def plot_video_with_surface(
             with plt.style.context("seaborn-v0_8-whitegrid"):
                 for time_idx in tqdm(range(0, sim_time.shape[0], int(step))):
 
+                    current_time = sim_time[time_idx]
+                    ax.set_title(f"Simulation Time: {current_time:.2f} seconds")
+                    
                     for rod_idx in range(n_visualized_rods):
                         inst_position, inst_radius = rod_history_unpacker(
                             rod_idx, time_idx
@@ -361,7 +367,10 @@ def plot_video_with_surface(
         with writer.saving(fig, video_name_2D, dpi):
             with plt.style.context("seaborn-v0_8-whitegrid"):
                 for time_idx in tqdm(range(0, sim_time.shape[0], int(step))):
-
+                    
+                    current_time = sim_time[time_idx]
+                    ax.set_title(f"Simulation Time: {current_time:.2f} seconds")
+                    
                     for rod_idx in range(n_visualized_rods):
                         inst_position, inst_radius = rod_history_unpacker(
                             rod_idx, time_idx
@@ -426,6 +435,9 @@ def plot_video_with_surface(
             with plt.style.context("seaborn-v0_8-whitegrid"):
                 for time_idx in tqdm(range(0, sim_time.shape[0], int(step))):
 
+                    current_time = sim_time[time_idx]
+                    ax.set_title(f"Simulation Time: {current_time:.2f} seconds")
+                    
                     for rod_idx in range(n_visualized_rods):
                         inst_position, inst_radius = rod_history_unpacker(
                             rod_idx, time_idx
