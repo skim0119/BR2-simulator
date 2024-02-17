@@ -9,14 +9,17 @@ def print_histgram(data):
     
     plt.figure()
     
-    plt.hist(x, bins=30, alpha=0.5, edgecolor='black')
+    n, *_=plt.hist(x, bins=30, alpha=0.5, edgecolor='black')
+    
+    max_value = x.max()
 
-    plt.title('Histogram of delta L')  
+    plt.title('Histogram of delta L(max_penetration=%f)'%max_value) 
     plt.xlabel('delta_L/R (R is the out_radius)')  
     plt.ylabel('Count')  
     plt.axvline(x=0.3, color='r', linestyle='--')
     
-    plt.text(0.295, 2.6e6, '0.3',color='red', fontsize=14, verticalalignment='bottom', horizontalalignment='right')
+ 
+    plt.text(0.295, 0.95*max(n),'0.3', color='red', fontsize=14, verticalalignment='bottom', horizontalalignment='right')
 
 
     
@@ -46,7 +49,7 @@ def print_deltaL_3d(data):
     
 
 def main():
-    data = np.loadtxt('F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.9\\Disatance_Record.txt')
+    data = np.loadtxt('F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.9\\Disatance_Record_only_bend.txt')
     print_histgram(data)
     print_deltaL_3d(data)
     plt.show()
