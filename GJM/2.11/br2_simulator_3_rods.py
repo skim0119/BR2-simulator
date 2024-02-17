@@ -24,13 +24,13 @@ def main():
     args = parser.parse_args()
 
     # Action Configuration
-    psi2Nm2 = 700000000
+    psi2Nm2 = 6895
 
     # Actuation Profile
-    action = {"action1": 30 * psi2Nm2, "action2": 30 * psi2Nm2}
+    action = {"action1": 0 * psi2Nm2, "action2": 20 * psi2Nm2} #0-40 range for pressure
 
-    # Prepare environment
-    env = Environment(run_tag=args.tag)
+    # Prepare environment4
+    env = Environment(run_tag=args.tag, time_step=1e-5)#change dt to 1.5e-5, original magnitude is 2e-5
     env.reset(
         rod_database_path="F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.11\\rod_library_GJM.json",
         assembly_config_path="F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.11\\single_br2_GJM.json",
@@ -45,7 +45,7 @@ def main():
     env.render_video(
         # The following parameters are optional
         x_limits=(-0.13, 0.13),  # Set bounds on x-axis
-        y_limits=(-0.00, 0.5),  # Set bounds on y-axis
+        y_limits=(-0.00, 0.3),  # Set bounds on y-axis
         z_limits=(-0.13, 0.13),  # Set bounds on z-axis
         dpi=100,  # Set the quality of the image
         vis3D=True,  # Turn on 3D visualization
