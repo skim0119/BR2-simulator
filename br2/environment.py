@@ -14,6 +14,7 @@ import numpy as np
 from elastica import *
 from elastica._calculus import _isnan_check
 from elastica.timestepper import extend_stepper_interface
+from elastica.rod.knot_theory import compute_twist
 
 from br2.post_processing import plot_video_with_surface
 
@@ -440,11 +441,15 @@ class Environment:
         # external_force_rod_0 = self.data_rods[0]["external_forces"]
         # external_force_rod_1 = self.data_rods[1]["external_forces"]
         # external_force_rod_2 = self.data_rods[2]["external_forces"]
+        
+        center_line = np.array(self.data_rods[0]["position"])
+        
         np.savez(
             path,
             time=np.array(self.data_rods[0]["time"]),
             director_rod_0=director_rod_0,
             position_rod_0=position_rod_0[:,:,-1],#just record the tip position
+            center_line=center_line
             # position_rod_1=position_rod_1[:,:,-1],
             # position_rod_2=position_rod_2[:,:,-1],
             # external_force_rod_0=external_force_rod_0,

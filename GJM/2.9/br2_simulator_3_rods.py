@@ -27,7 +27,7 @@ def main():
     psi2Nm2 = 6895
 
     # Actuation Profile
-    action = {"action1": 30 * psi2Nm2, "action2": 30 * psi2Nm2}
+    action = {"action1": 0 * psi2Nm2, "action2": 30 * psi2Nm2}
 
     # Prepare environment
     env = Environment(run_tag=args.tag)
