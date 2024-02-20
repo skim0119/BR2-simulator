@@ -155,7 +155,7 @@ class SurfaceJointSideBySide(FreeJoint):
             rod_two.external_forces,
         )
         
-        Count_Distance(distance)
+        # Count_Distance(distance)
 
     @staticmethod
     @njit(cache=True)
