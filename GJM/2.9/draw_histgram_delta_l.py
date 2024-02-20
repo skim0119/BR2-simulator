@@ -41,7 +41,7 @@ def print_deltaL_3d(data):
     
     surf = ax.plot_surface(x,y,z,cmap='viridis')# viridis define the color
     
-    ax.set_xlabel('L')
+    ax.set_xlabel('Position/rod_length')
     ax.set_ylabel('time (ms)')
     ax.set_zlabel('delta_L/R (R is the out_radius)')
     
@@ -49,7 +49,7 @@ def print_deltaL_3d(data):
     
 
 def main():
-    data = np.loadtxt('F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.9\\Disatance_Record_only_bend.txt')
+    data = np.loadtxt('F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.9\\Disatance_Record_only_twist.txt')
     print_histgram(data)
     print_deltaL_3d(data)
     plt.show()

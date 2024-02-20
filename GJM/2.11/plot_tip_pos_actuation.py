@@ -5,13 +5,11 @@ import sys
 sys.path.append('f:\\Soft_arm\\Code_br2\\BR2-simulator')
 
 import br2
-
 import numpy as np
-
 np.set_printoptions(precision=4)
 
 from br2.environment import Environment
-
+from elastica.rod.knot_theory import compute_twist
 import argparse
 
 from tqdm import tqdm
@@ -30,7 +28,8 @@ def main():
     
     #initial tip_pos relating array
     tip_pos_row = []
-    tip_pos_total = []   
+    tip_pos_total = [] 
+    rot_degrees = []  
     
     # Actuation Profile
     for i in tqdm(range(0,41,5)):#include 40
@@ -51,7 +50,8 @@ def main():
             
             env.save_data()
             
-            data = np.load("F:\\Soft_arm\\Code_br2\\BR2-simulator\\result_2_16\\data\\br2_data.npz") #tip pos relating to bend/twist pressure will be stocked here
+            #save the tip position
+            data = np.load("F:\\Soft_arm\\Code_br2\\BR2-simulator\\result_2_19_tip_pos\\data\\br2_data.npz") #tip pos relating to bend/twist pressure will be stocked here
 
             tip_pos_temp = data["position_rod_0"][-1,...]#just have the last step tip position
             tip_pos_temp = tip_pos_temp.reshape([3,1])
@@ -60,7 +60,14 @@ def main():
                 tip_pos_row = tip_pos_temp
             else:
                 tip_pos_row = np.hstack((tip_pos_row,tip_pos_temp))#make its shape be [3,j]    
-
+                
+            #calculate the rotation angle
+            director_total = data["director_rod_0"]
+            center_line = data["center_line"]
+            normal_total = np.array(director_total[:,0,...])
+            rot_degrees_temp,_ = compute_twist(center_line,normal_total)
+            rot_degrees_temp = np.degrees(rot_degrees_temp[-1])
+            rot_degrees = np.append(rot_degrees,rot_degrees_temp)
             # Terminate
             env.close()
         
@@ -71,7 +78,9 @@ def main():
             tip_pos_total = np.dstack((tip_pos_total,tip_pos_row))#make its shape be [3,j,i]
     
     #save it to npz filw        
-    np.savez("F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.15\\tip_pose.npz", tip_pos = tip_pos_total)
+    np.savez("F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.19\\tip_pose.npz", 
+             tip_pos = tip_pos_total,
+             rot_degrees = rot_degrees)
 
     
     

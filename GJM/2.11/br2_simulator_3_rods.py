@@ -27,7 +27,7 @@ def main():
     psi2Nm2 = 6895
 
     # Actuation Profile
-    action = {"action1": 0 * psi2Nm2, "action2": 20 * psi2Nm2} #0-40 range for pressure
+    action = {"action1": 0 * psi2Nm2, "action2": 40 * psi2Nm2} #0-40 range for pressure
 
     # Prepare environment4
     env = Environment(run_tag=args.tag, time_step=1e-5)#change dt to 1.5e-5, original magnitude is 2e-5

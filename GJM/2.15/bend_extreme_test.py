@@ -16,7 +16,7 @@ from br2.environment import Environment
 
 import argparse
 
-from calculate_rotation_degree import calculate_degrees
+from elastica.rod.knot_theory import compute_twist
 
 from tqdm import tqdm
 
@@ -36,9 +36,9 @@ def main():
     #initial twist pressure and rotation_degree
     rot_degrees= []
     # Actuation Profile
-    for j in tqdm(range(0,200,5)):
+    for j in tqdm(range(0,40,5)):
         rot_degrees_prev = rot_degrees
-        action = {"action1": 40 * psi2Nm2, "action2": j * psi2Nm2} #0-40 range for pressure
+        action = {"action1": 00 * psi2Nm2, "action2": j * psi2Nm2} #0-40 range for pressure
 
 
         env.reset(
@@ -53,9 +53,14 @@ def main():
         
         env.save_data()
         
-        degrees = calculate_degrees()
-        
-        rot_degrees = np.append(rot_degrees,degrees)
+        #calculate twist angle
+        data = np.load("F:\\Soft_arm\\Code_br2\\BR2-simulator\\result_2_19_extreme_test\\data\\br2_data.npz")
+        director_total = data["director_rod_0"]
+        center_line = data["center_line"]
+        normal_total = np.array(director_total[:,0,...])
+        rot_degrees_temp,_ = compute_twist(center_line,normal_total)
+        rot_degrees_temp = np.degrees(rot_degrees_temp[-1])
+        rot_degrees = np.append(rot_degrees,rot_degrees_temp)
         
     print(rot_degrees)
 
@@ -77,7 +82,7 @@ def main():
     
     rot_degrees = np.array(rot_degrees)
     
-    with open('F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.15\\rot_degree_bend.txt','w') as file:
+    with open('F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.19\\rot_degree_without_bend.txt','w') as file:
         file.writelines([str(d)+' ' for d in rot_degrees])
         file.write('\n')
 
