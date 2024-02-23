@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 def main():
     data = np.load("F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.19\\tip_pose.npz")
     tip_pos = data["tip_pos"]#（3,j,i) j is the twist pressure; i is the bend pressure; may need to regenerate to have bend pressure in front
-    rot_degrees = data["rot_degrees"]
-    rot_degrees = rot_degrees.reshape(9,9)
+    rot_degrees = data["rot_degrees"][0,...]
     # print(rot_degrees[0,...]) to check if reshape is right
+    print(np.shape(rot_degrees))
     
     x_tip_pos = np.abs(tip_pos[0,...])
     y_tip_pos = 0.15-np.abs(tip_pos[1,...])

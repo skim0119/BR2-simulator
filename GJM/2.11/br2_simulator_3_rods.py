@@ -34,7 +34,8 @@ def main():
     env.reset(
         rod_database_path="F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.11\\rod_library_GJM.json",
         assembly_config_path="F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.11\\single_br2_GJM.json",
-        gravity=True
+        gravity=True,
+        k_multiplier=0.1,
     )
 
     # Simulation

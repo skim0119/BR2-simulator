@@ -67,20 +67,26 @@ def main():
             normal_total = np.array(director_total[:,0,...])
             rot_degrees_temp,_ = compute_twist(center_line,normal_total)
             rot_degrees_temp = np.degrees(rot_degrees_temp[-1])
-            rot_degrees = np.append(rot_degrees,rot_degrees_temp)
+            
+            if j==0:
+                rot_degrees = rot_degrees_temp
+            else:
+                rot_degrees = np.append(rot_degrees,rot_degrees_temp)
             # Terminate
             env.close()
         
         #save it in the first dimension of tip_pos_total
         if i==0:
             tip_pos_total = tip_pos_row
+            rot_degrees_total = rot_degrees
         else:
             tip_pos_total = np.dstack((tip_pos_total,tip_pos_row))#make its shape be [3,j,i]
+            rot_degrees_total = np.dstack((rot_degrees_total,rot_degrees))
     
     #save it to npz filw        
     np.savez("F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.19\\tip_pose.npz", 
              tip_pos = tip_pos_total,
-             rot_degrees = rot_degrees)
+             rot_degrees = rot_degrees_total)
 
     
     

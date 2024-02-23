@@ -36,7 +36,7 @@ def main():
     #initial twist pressure and rotation_degree
     rot_degrees= []
     # Actuation Profile
-    for j in tqdm(range(0,40,5)):
+    for j in tqdm(range(0,200,5)):
         rot_degrees_prev = rot_degrees
         action = {"action1": 00 * psi2Nm2, "action2": j * psi2Nm2} #0-40 range for pressure
 
@@ -44,7 +44,8 @@ def main():
         env.reset(
             rod_database_path="F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.11\\rod_library_GJM.json",
             assembly_config_path="F:\\Soft_arm\\Code_br2\\BR2-simulator\\GJM\\2.11\\single_br2_GJM.json",
-            gravity=True
+            gravity=True,
+            k_multiplier=1e-1,
         )
 
         # Simulation
