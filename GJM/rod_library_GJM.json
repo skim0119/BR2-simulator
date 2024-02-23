@@ -1,0 +1,29 @@
+{ 
+    "Info": "GJM set of BR2 properties",
+    "DefaultParams": {
+        "n_elements"       : 40,
+        "direction"        : [0.0,1.0,0.0],
+        "normal"           : [0.0,0.0,1.0],
+        "base_length"      : 0.15,
+        "outer_radius"     : 0.005,
+        "inner_radius"     : 0.003,
+        "density"          : 1000,
+        "damping_constant" : 0.5,
+        "youngs_modulus"   : 1.00e6,
+        "shear_modulus"    : 6.66e6
+    },
+    "Rods": {
+        "RodBend": {
+            "Info"  : "Simple bend rod for test",
+            "gamma" : [0]
+        },
+        "RodRightTwist": {
+            "Info"  : "Simple right-hand twist rod for test",
+            "alpha" : [60]
+        },
+        "RodLeftTwist": {
+            "Info" : "Simple left-hand twist rod for test",
+            "beta" : [-60]
+        }
+    }
+}
