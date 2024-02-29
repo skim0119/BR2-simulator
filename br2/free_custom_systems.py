@@ -7,7 +7,7 @@ from elastica._linalg import _batch_cross, _batch_dot, _batch_norm, _batch_matve
 from elastica._linalg import _batch_product_i_k_to_ik
 from elastica.boundary_conditions import ConstraintBase
 
-from br2.surface_connection_parallel_rod_numba import _single_inv_rotate, _single_get_rotation_matrix
+from br2.legacy_surface_connection_parallel_rod_numba import _single_inv_rotate, _single_get_rotation_matrix
 
 import numpy as np
 import numba

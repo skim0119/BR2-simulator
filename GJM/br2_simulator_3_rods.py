@@ -2,7 +2,7 @@ import os
 import sys
 
 # sys.settrace
-sys.path.append('f:\\Soft_arm\\Code_br2_v0.1.1\\BR2-simulator')
+sys.path.append('F:\\Soft_arm\\Code_br2_v0.1.1\\BR2-simulator')
 # print(sys.path)
 
 import br2
@@ -32,10 +32,11 @@ def main():
     # Prepare environment4
     env = Environment(run_tag=args.tag, time_step=1e-5)#change dt to 1.5e-5, original magnitude is 2e-5
     env.reset(
-        rod_database_path="rod_library_GJM.json",
-        assembly_config_path="single_br2_GJM.json",
+        rod_database_path="GJM\\rod_library_GJM.json",
+        assembly_config_path="GJM\\single_br2_GJM.json",
         gravity=True,
         k_multiplier=0.1,
+        k_repulsive =1e-3,
     )
 
     # Simulation
@@ -46,7 +47,7 @@ def main():
     env.render_video(
         # The following parameters are optional
         x_limits=(-0.13, 0.13),  # Set bounds on x-axis
-        y_limits=(-0.00, 0.3),  # Set bounds on y-axis
+        y_limits=(-0.00, 0.2),  # Set bounds on y-axis
         z_limits=(-0.13, 0.13),  # Set bounds on z-axis
         dpi=100,  # Set the quality of the image
         vis3D=True,  # Turn on 3D visualization
