@@ -18,9 +18,9 @@ from elastica._calculus import _clip_array
 from elastica._linalg import _batch_cross, _batch_dot, _batch_norm, _batch_matvec
 from elastica._linalg import _batch_product_i_k_to_ik
 from elastica.restart import save_state, load_state
+from elastica.experimental.connection_contact_joint.parallel_connection import SurfaceJointSideBySide, get_connection_vector_straight_straight_rod
 
-from br2.surface_connection_parallel_rod_numba import (
-    SurfaceJointSideBySide,
+from br2.legacy_surface_connection_parallel_rod_numba import (
     TipToTipStraightJoint
 )
 
@@ -82,6 +82,7 @@ class FreeAssembly:
         self.k_multiplier = kwargs.get('t_multiplier', 1) #* 1.0e-2
         self.nu_multiplier = kwargs.get('nu_multiplier', 1) * 1.0e-3
         self.kt_multiplier = kwargs.get('kt_multiplier', 1) #* 0.0 #1e0
+        self.k_repulsive = kwargs.get('k_repulsive',1)
 
     def save_state(self, **kwargs):
         # kwargs: directory, time, verbose
@@ -178,6 +179,7 @@ class FreeAssembly:
             k_connection = np.pi * outer_radius * E / n_elem * self.k_multiplier
             nu_connection = base_length / n_elem * self.nu_multiplier
             kt_connection = outer_radius / 2 * self.kt_multiplier
+            k_repulsive = self.k_repulsive
             #print(f'  {k_connection=} {nu_connection=} {kt_connection=}')
             for rod_i in range(len(seg_rods)):
                 first_rod_name = seg_rods[rod_i-1]
@@ -187,7 +189,8 @@ class FreeAssembly:
                                              second_rod_name,
                                              k=k_connection,
                                              nu=nu_connection,
-                                             kt=kt_connection)
+                                             kt=kt_connection,
+                                             k_repulsive=k_repulsive)
 
             if seg_idx > 0:
                 '''Serial Connection'''
@@ -340,36 +343,29 @@ class FreeAssembly:
         )
         return callback_params
 
-    def glue_rods_surface_connection(self, rod1, rod2, k, nu, kt):
-        rod1_pos = 0.5 * (
-                rod1.position_collection[..., 1:]
-                + rod1.position_collection[..., :-1]
+    def glue_rods_surface_connection(self, rod1, rod2, k, nu, kt, k_repulsive):
+       
+        rod_one_direction_vec_in_material_frame,rod_two_direction_vec_in_material_frame,offset_btw_rods=get_connection_vector_straight_straight_rod(
+            rod_one=rod1,
+            rod_two=rod2,
+            rod_one_idx=(0,rod1.n_elems),
+            rod_two_idx=(0,rod2.n_elems)
         )
-        rod2_pos = 0.5 * (
-                rod2.position_collection[..., 1:]
-                + rod2.position_collection[..., :-1]
-        )
-        rod1_Q = rod1.director_collection
-        rod2_Q = rod2.director_collection
-        distance = _batch_norm(rod2_pos - rod1_pos)
-        assert np.allclose(
-            distance, rod1.outer_radius + rod2.outer_radius
-        ), "Not all elements are touching eachother"
-        connection_lab = (rod2_pos - rod1_pos) / distance
-        rod1_rd2_local = _batch_matvec(rod1_Q, connection_lab)  # local frame
-        rod2_rd2_local = _batch_matvec(rod2_Q, -connection_lab)  # local frame
-
-        self.simulator.connect(
-            first_rod=rod1, second_rod=rod2
-        ).using(
-            SurfaceJointSideBySide,
-            k=k,
-            nu=nu,
-            kt=kt,
-            rd1_local=rod1_rd2_local,
-            rd2_local=rod2_rd2_local,
-            stability_check=False
-        )
+        
+        n_elems = rod1.n_elems
+        
+        for i in range(n_elems):
+            self.simulator.connect(
+                first_rod=rod1, second_rod=rod2, first_connect_idx=i, second_connect_idx=i
+            ).using(
+                SurfaceJointSideBySide,
+                k=k,
+                nu=nu,
+                k_repulsive=k_repulsive,
+                rod_one_direction_vec_in_material_frame=rod_one_direction_vec_in_material_frame[:, i],
+                rod_two_direction_vec_in_material_frame=rod_two_direction_vec_in_material_frame[:, i],
+                offset_btw_rods=offset_btw_rods[i],
+            )
 
     def tip_to_base_connection(self, rod1, rod2, k, nu, kt):
         rod1_elem_pos = 0.5 * (

@@ -121,7 +121,7 @@ def plot_video_with_surface(
         ax.set_ylim(*xlim)
 
         video_name_2d_quiv = os.path.join(save_folder, video_name + "_2D_directors_last.mp4")
-        with writer.saving(fig, video_name_2d_quiv, dpi), plt.style.context("seaborn-whitegrid"):
+        with writer.saving(fig, video_name_2d_quiv, dpi), plt.style.context("seaborn-v0_8-whitegrid"):
             time_idx = 0
             quiver_axes = [[] for _ in range(n_rod)]
             for rod_idx in range(n_rod):
@@ -169,7 +169,7 @@ def plot_video_with_surface(
         ax.set_zlim(*ylim)
 
         video_name_3D = os.path.join(save_folder, video_name + "_3D_directors.mp4")
-        with writer.saving(fig, video_name_3D, dpi), plt.style.context("seaborn-whitegrid"):
+        with writer.saving(fig, video_name_3D, dpi), plt.style.context("seaborn-v0_8-whitegrid"):
             time_idx = 0
             quiver_axes = [[] for _ in range(n_visualized_rods)]
             for rod_idx in range(0, n_visualized_rods):
@@ -236,8 +236,11 @@ def plot_video_with_surface(
         video_name_3D = os.path.join(save_folder, video_name + "_3D.mp4")
 
         with writer.saving(fig, video_name_3D, dpi):
-            with plt.style.context("seaborn-whitegrid"):
+            with plt.style.context("seaborn-v0_8-whitegrid"):
                 for time_idx in tqdm(range(0, sim_time.shape[0], int(step))):
+                    
+                    current_time = sim_time[time_idx]
+                    ax.set_title(f"Simulation Time: {current_time:.2f} seconds")
 
                     for rod_idx in range(n_visualized_rods):
                         inst_position, inst_radius = rod_history_unpacker(
@@ -297,9 +300,12 @@ def plot_video_with_surface(
         video_name_2D = os.path.join(save_folder, video_name + "_2D_xy.mp4")
 
         with writer.saving(fig, video_name_2D, dpi):
-            with plt.style.context("seaborn-whitegrid"):
+            with plt.style.context("seaborn-v0_8-whitegrid"):
                 for time_idx in tqdm(range(0, sim_time.shape[0], int(step))):
 
+                    current_time = sim_time[time_idx]
+                    ax.set_title(f"Simulation Time: {current_time:.2f} seconds")
+                    
                     for rod_idx in range(n_visualized_rods):
                         inst_position, inst_radius = rod_history_unpacker(
                             rod_idx, time_idx
@@ -359,9 +365,12 @@ def plot_video_with_surface(
         video_name_2D = os.path.join(save_folder, video_name + "_2D_yz.mp4")
 
         with writer.saving(fig, video_name_2D, dpi):
-            with plt.style.context("seaborn-whitegrid"):
+            with plt.style.context("seaborn-v0_8-whitegrid"):
                 for time_idx in tqdm(range(0, sim_time.shape[0], int(step))):
-
+                    
+                    current_time = sim_time[time_idx]
+                    ax.set_title(f"Simulation Time: {current_time:.2f} seconds")
+                    
                     for rod_idx in range(n_visualized_rods):
                         inst_position, inst_radius = rod_history_unpacker(
                             rod_idx, time_idx
@@ -423,9 +432,12 @@ def plot_video_with_surface(
         video_name_2D = os.path.join(save_folder, video_name + "_2D_zx.mp4")
 
         with writer.saving(fig, video_name_2D, dpi):
-            with plt.style.context("seaborn-whitegrid"):
+            with plt.style.context("seaborn-v0_8-whitegrid"):
                 for time_idx in tqdm(range(0, sim_time.shape[0], int(step))):
 
+                    current_time = sim_time[time_idx]
+                    ax.set_title(f"Simulation Time: {current_time:.2f} seconds")
+                    
                     for rod_idx in range(n_visualized_rods):
                         inst_position, inst_radius = rod_history_unpacker(
                             rod_idx, time_idx

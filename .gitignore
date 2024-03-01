@@ -10,6 +10,12 @@ __pycache__/
 
 result*
 
+# Txt
+*.txt
+
+# Npz
+*.npz
+
 # Distribution / packaging
 .Python
 build/
@@ -131,3 +137,4 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+GJM/
