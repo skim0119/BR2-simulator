@@ -16,6 +16,7 @@ from elastica._calculus import _isnan_check
 from elastica.timestepper import extend_stepper_interface
 
 from br2.post_processing import plot_video_with_surface
+from br2.visual_twist_angle import visual_twist_with_surface
 
 from br2.free_simulator import FreeAssembly
 
@@ -249,6 +250,15 @@ class Environment:
 
         # Set action
         self.assy.set_actuation(action)
+        
+        #for hollow structure
+        for rod_key in self.shearable_rods:
+            rod = self.shearable_rods[rod_key]
+            outer_radius = rod.outer_radius
+            inner_radius = rod.inner_radius
+            hollow_scale = ((2*outer_radius)**4-(2*inner_radius)**4)/((2*outer_radius)**4)
+            rod.bend_matrix = hollow_scale*rod.bend_matrix
+            rod.shear_matrix = hollow_scale*rod.shear_matrix
 
         # Record previous-step
         if check_steady_state == 2:
@@ -409,6 +419,17 @@ class Environment:
             save_folder=save_folder,
             **kwargs,
         )
+        
+        visual_twist_angle = kwargs.get('visual_twist_angle',False)
+        if visual_twist_angle == True:
+            visual_twist_with_surface(
+                self.data_rods,
+                video_name=filename_video,
+                fps=self.rendering_fps,
+                step=1,
+                save_folder=save_folder,
+                **kwargs,
+            )
 
         self.save_data("position")
 
@@ -427,10 +448,31 @@ class Environment:
         path = os.path.join(self.paths.data, filename)
         position_rod = np.array(self.data_rods[0]["position"])
         position_rod = 0.5 * (position_rod[..., 1:] + position_rod[..., :-1])
+        position_rod_0 = position_rod
+        position_rod_1 = np.array(self.data_rods[1]["position"])
+        position_rod_1 = 0.5 * (position_rod_1[..., 1:] + position_rod_1[..., :-1])
+        position_rod_2 = np.array(self.data_rods[2]["position"])
+        position_rod_2 = 0.5 * (position_rod_2[..., 1:] + position_rod_2[..., :-1])          
+
+        director_rod_0 = np.array(self.data_rods[0]["director"])
+        director_rod_1 = np.array(self.data_rods[1]["director"])
+        director_rod_2 = np.array(self.data_rods[2]["director"])
+        center_line_0 = np.array(self.data_rods[0]["position"])
+        center_line_1 = np.array(self.data_rods[1]["position"])
+        center_line_2 = np.array(self.data_rods[2]["position"])
         np.savez(
             path,
             time=np.array(self.data_rods[0]["time"]),
             position_rod=position_rod,
+            position_rod_0=position_rod_0,
+            position_rod_1=position_rod_1,
+            position_rod_2=position_rod_2,
+            director_rod_0=director_rod_0,
+            director_rod_1=director_rod_1,
+            director_rod_2=director_rod_2,
+            center_line_0=center_line_0,
+            center_line_1=center_line_1,
+            center_line_2=center_line_2,
         )
 
     def close(self):
