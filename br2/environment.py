@@ -256,9 +256,10 @@ class Environment:
             rod = self.shearable_rods[rod_key]
             outer_radius = rod.outer_radius
             inner_radius = rod.inner_radius
-            hollow_scale = ((2*outer_radius)**4-(2*inner_radius)**4)/((2*outer_radius)**4)
-            rod.bend_matrix = hollow_scale*rod.bend_matrix
-            rod.shear_matrix = hollow_scale*rod.shear_matrix
+            hollow_scale_bend = ((2*outer_radius)**4-(2*inner_radius)**4)/((2*outer_radius)**4)
+            hollow_scale_shear = ((2*outer_radius)**2-(2*inner_radius)**2)/((2*outer_radius)**2)
+            rod.bend_matrix = hollow_scale_bend*rod.bend_matrix
+            rod.shear_matrix = hollow_scale_shear*rod.shear_matrix
 
         # Record previous-step
         if check_steady_state == 2:
