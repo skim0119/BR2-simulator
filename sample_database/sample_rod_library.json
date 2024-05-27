@@ -10,20 +10,24 @@
         "density"          : 1500,
         "damping_constant" : 0.5,
         "youngs_modulus"   : 1.00e7,
-        "shear_modulus"    : 6.66e6
+        "shear_modulus"    : 6.66e6,
+        "hollow"           : false
     },
     "Rods": {
         "RodBend": {
             "Info"  : "Simple bend rod for test",
-            "gamma" : [0]
+            "gamma" : [0],
+            "hollow" : true
         },
         "RodRightTwist": {
             "Info"  : "Simple right-hand twist rod for test",
-            "alpha" : [60]
+            "alpha" : [60],
+            "hollow" : true
         },
         "RodLeftTwist": {
             "Info" : "Simple left-hand twist rod for test",
-            "beta" : [-60]
+            "beta" : [-60],
+            "hollow" : true
         }
     }
 }

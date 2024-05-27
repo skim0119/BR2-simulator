@@ -163,6 +163,13 @@ class FreeAssembly:
                         break
 
                 rod = self.add_free(rod_name, actuation_name, **rod_spec)
+                if rod_spec['hollow']:
+                    outer_radius = rod.outer_radius
+                    inner_radius = rod.inner_radius
+                    hollow_scale_bend = ((2*outer_radius)**4-(2*inner_radius)**4)/((2*outer_radius)**4)
+                    hollow_scale_shear = ((2*outer_radius)**2-(2*inner_radius)**2)/((2*outer_radius)**2)
+                    rod.bend_matrix = hollow_scale_bend*rod.bend_matrix
+                    rod.shear_matrix = hollow_scale_shear*rod.shear_matrix
 
                 self.free[rod_name] = rod
                 seg_rods.append(rod_name)
