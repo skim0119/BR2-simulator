@@ -4,15 +4,11 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import to_rgb
 import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import proj3d, Axes3D
-#from tqdm import tqdm
+from tqdm import tqdm
 
 from typing import Dict, Sequence
 from elastica.rod.knot_theory import compute_twist
 
-#plt.rcParams.update({"font.size": 22})
-
-def tqdm(obj): # tqdm suppressor
-    return obj
 
 def visual_twist_with_surface(
     rods_history: Sequence[Dict],

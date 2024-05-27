@@ -15,8 +15,8 @@ from elastica import *
 from elastica._calculus import _isnan_check
 from elastica.timestepper import extend_stepper_interface
 
-from br2.post_processing import plot_video_with_surface
-from br2.visual_twist_angle import visual_twist_with_surface
+from br2.visualize.post_processing import plot_video_with_surface
+from br2.visualize.twist_angle import visual_twist_with_surface
 
 from br2.free_simulator import FreeAssembly
 
