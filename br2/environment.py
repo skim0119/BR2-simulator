@@ -389,6 +389,7 @@ class Environment:
 
     def render_video(
         self,
+        visualize_twist_angle:bool=False,
         **kwargs,
     ) -> None:
         """
@@ -411,8 +412,7 @@ class Environment:
             **kwargs,
         )
         
-        visual_twist_angle = kwargs.get('visual_twist_angle',False)
-        if visual_twist_angle == True:
+        if visualize_twist_angle:
             visual_twist_with_surface(
                 self.data_rods,
                 video_name=filename_video,
