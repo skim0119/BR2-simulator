@@ -4,14 +4,17 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import to_rgb
 import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import proj3d, Axes3D
-#from tqdm import tqdm
+
+# from tqdm import tqdm
 
 from typing import Dict, Sequence
 
-#plt.rcParams.update({"font.size": 22})
+# plt.rcParams.update({"font.size": 22})
 
-def tqdm(obj): # tqdm suppressor
+
+def tqdm(obj):  # tqdm suppressor
     return obj
+
 
 def plot_video_2d(
     plot_params1: dict, plot_params2: dict, video_name="video.mp4", margin=0.2, fps=40
@@ -59,7 +62,6 @@ def plot_video_2d(
     plt.close(plt.gcf())
 
 
-
 def plot_video_with_surface(
     rods_history: Sequence[Dict],
     video_name="video",
@@ -77,14 +79,17 @@ def plot_video_with_surface(
     n_visualized_rods = len(rods_history)  # should be one for now
     # Rod info
     def rod_history_unpacker(rod_idx, t_idx):
-        return rods_history[rod_idx]["position"][t_idx], rods_history[rod_idx]["radius"][t_idx]
+        return (
+            rods_history[rod_idx]["position"][t_idx],
+            rods_history[rod_idx]["radius"][t_idx],
+        )
 
     # Rod center of mass
     def com_history_unpacker(rod_idx, t_idx):
         return rods_history[rod_idx]["com"][t_idx]
 
     # video pre-processing
-    #print("plot scene visualization video")
+    # print("plot scene visualization video")
     FFMpegWriter = animation.writers["ffmpeg"]
     metadata = dict(title="Movie Test", artist="Matplotlib", comment="Movie support!")
     writer = FFMpegWriter(fps=fps, metadata=metadata)
@@ -102,12 +107,18 @@ def plot_video_with_surface(
 
     if kwargs.get("vis2D_director_lastelement", False):
         _length = 0.070
-        color_scheme = plt.rcParams['axes.prop_cycle'].by_key()['color']
-        directors = np.array([data['director'] for data in rods_history])[:,:,:,[0,2],...]
-        positions = np.array([data['position'] for data in rods_history])[:,:,[0,2],...]
-        positions = 0.5 * (positions[...,1:] + positions[...,:-1]) # Get element position
-        directors = directors[...,-1]
-        positions = positions[...,-1]
+        color_scheme = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+        directors = np.array([data["director"] for data in rods_history])[
+            :, :, :, [0, 2], ...
+        ]
+        positions = np.array([data["position"] for data in rods_history])[
+            :, :, [0, 2], ...
+        ]
+        positions = 0.5 * (
+            positions[..., 1:] + positions[..., :-1]
+        )  # Get element position
+        directors = directors[..., -1]
+        positions = positions[..., -1]
         n_elem = 1
         n_rod = directors.shape[0]
 
@@ -120,25 +131,31 @@ def plot_video_with_surface(
         ax.set_xlim(*zlim)
         ax.set_ylim(*xlim)
 
-        video_name_2d_quiv = os.path.join(save_folder, video_name + "_2D_directors_last.mp4")
-        with writer.saving(fig, video_name_2d_quiv, dpi), plt.style.context("seaborn-v0_8-whitegrid"):
+        video_name_2d_quiv = os.path.join(
+            save_folder, video_name + "_2D_directors_last.mp4"
+        )
+        with writer.saving(fig, video_name_2d_quiv, dpi), plt.style.context(
+            "seaborn-v0_8-whitegrid"
+        ):
             time_idx = 0
             quiver_axes = [[] for _ in range(n_rod)]
             for rod_idx in range(n_rod):
                 position = positions[rod_idx, time_idx, ...]
                 director = directors[rod_idx, time_idx, ...] * _length
                 for i in range(3):
-                    quiver_axes[rod_idx].append(ax.quiver(*position, *director[i], color=color_scheme[rod_idx]))
+                    quiver_axes[rod_idx].append(
+                        ax.quiver(*position, *director[i], color=color_scheme[rod_idx])
+                    )
                 ax.set_aspect("auto")
             writer.grab_frame()
-            #ax.set_aspect("equal")
+            # ax.set_aspect("equal")
             for time_idx in tqdm(range(0, sim_time.shape[0], int(step))):
                 for rod_idx in range(n_rod):
                     position = positions[rod_idx, time_idx, ...]
                     director = directors[rod_idx, time_idx, ...] * _length
                     for i in range(3):
                         quiver_axes[rod_idx][i].set_offsets([position.tolist()])
-                        quiver_axes[rod_idx][i].set_UVC(*director[i,:].tolist())
+                        quiver_axes[rod_idx][i].set_UVC(*director[i, :].tolist())
                 writer.grab_frame()
 
         # Be a good boy and close figures
@@ -149,12 +166,16 @@ def plot_video_with_surface(
     if kwargs.get("vis3D_director", False):
         _length = 0.070
         skip_element = 5
-        color_scheme = plt.rcParams['axes.prop_cycle'].by_key()['color']
-        directors = np.array([data['director'] for data in rods_history])[...,::skip_element]
-        positions = np.array([data['position'] for data in rods_history])[...,::skip_element]
-        #positions = 0.5 * (positions[...,1:] + positions[...,:-1]) # Get element position
-        #positions[:,[0,1,2],:] = positions[:,[2,0,1],:] # Swap axis for visualization purpose
-        #directors[:,:,[0,1,2],:] = directors[:,:,[2,0,1],:] # TODO: need to rotate
+        color_scheme = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+        directors = np.array([data["director"] for data in rods_history])[
+            ..., ::skip_element
+        ]
+        positions = np.array([data["position"] for data in rods_history])[
+            ..., ::skip_element
+        ]
+        # positions = 0.5 * (positions[...,1:] + positions[...,:-1]) # Get element position
+        # positions[:,[0,1,2],:] = positions[:,[2,0,1],:] # Swap axis for visualization purpose
+        # directors[:,:,[0,1,2],:] = directors[:,:,[2,0,1],:] # TODO: need to rotate
         n_elem = positions.shape[-1]
 
         fig = plt.figure(1, figsize=(10, 8), frameon=True, dpi=dpi)
@@ -169,24 +190,39 @@ def plot_video_with_surface(
         ax.set_zlim(*ylim)
 
         video_name_3D = os.path.join(save_folder, video_name + "_3D_directors.mp4")
-        with writer.saving(fig, video_name_3D, dpi), plt.style.context("seaborn-v0_8-whitegrid"):
+        with writer.saving(fig, video_name_3D, dpi), plt.style.context(
+            "seaborn-v0_8-whitegrid"
+        ):
             time_idx = 0
             quiver_axes = [[] for _ in range(n_visualized_rods)]
             for rod_idx in range(0, n_visualized_rods):
                 position = positions[rod_idx, time_idx, ...]
                 director = directors[rod_idx, time_idx, ...]
                 for i in range(3):
-                    quiver_axes[rod_idx].append(ax.quiver(*position, *director[i], length=_length, color=color_scheme[rod_idx]))
+                    quiver_axes[rod_idx].append(
+                        ax.quiver(
+                            *position,
+                            *director[i],
+                            length=_length,
+                            color=color_scheme[rod_idx],
+                        )
+                    )
             writer.grab_frame()
 
-            #ax.set_aspect("equal")
+            # ax.set_aspect("equal")
             ax.set_aspect("auto")
             for time_idx in tqdm(range(0, sim_time.shape[0], int(step))):
                 for rod_idx in range(0, n_visualized_rods):
                     position = positions[rod_idx, time_idx, ...]
                     director = directors[rod_idx, time_idx, ...] * _length
                     for i in range(3):
-                        segs = [[position[:,j].tolist(), (position[:,j]+director[i,:,j]).tolist()] for j in range(n_elem)]
+                        segs = [
+                            [
+                                position[:, j].tolist(),
+                                (position[:, j] + director[i, :, j]).tolist(),
+                            ]
+                            for j in range(n_elem)
+                        ]
                         quiver_axes[rod_idx][i].set_segments(segs)
                 writer.grab_frame()
 
@@ -218,27 +254,27 @@ def plot_video_with_surface(
         for rod_idx in range(n_visualized_rods):
             inst_position, inst_radius = rod_history_unpacker(rod_idx, time_idx)
             _s = np.pi * (_scaling_factor * inst_radius[0]) ** 2
-            
+
             try:
                 rod_scatters[rod_idx] = ax.scatter(
                     -inst_position[2],
                     -inst_position[0],
                     inst_position[1],
                     s=_s,
-                    #s=inst_radius[0]**2
+                    # s=inst_radius[0]**2
                 )
             except ValueError:
                 print(_s)
-                input('')
+                input("")
 
-        #ax.set_aspect("equal")
+        # ax.set_aspect("equal")
         ax.set_aspect("auto")
         video_name_3D = os.path.join(save_folder, video_name + "_3D.mp4")
 
         with writer.saving(fig, video_name_3D, dpi):
             with plt.style.context("seaborn-v0_8-whitegrid"):
                 for time_idx in tqdm(range(0, sim_time.shape[0], int(step))):
-                    
+
                     current_time = sim_time[time_idx]
                     ax.set_title(f"Simulation Time: {current_time:.2f} seconds")
 
@@ -305,7 +341,7 @@ def plot_video_with_surface(
 
                     current_time = sim_time[time_idx]
                     ax.set_title(f"Simulation Time: {current_time:.2f} seconds")
-                    
+
                     for rod_idx in range(n_visualized_rods):
                         inst_position, inst_radius = rod_history_unpacker(
                             rod_idx, time_idx
@@ -367,10 +403,10 @@ def plot_video_with_surface(
         with writer.saving(fig, video_name_2D, dpi):
             with plt.style.context("seaborn-v0_8-whitegrid"):
                 for time_idx in tqdm(range(0, sim_time.shape[0], int(step))):
-                    
+
                     current_time = sim_time[time_idx]
                     ax.set_title(f"Simulation Time: {current_time:.2f} seconds")
-                    
+
                     for rod_idx in range(n_visualized_rods):
                         inst_position, inst_radius = rod_history_unpacker(
                             rod_idx, time_idx
@@ -437,7 +473,7 @@ def plot_video_with_surface(
 
                     current_time = sim_time[time_idx]
                     ax.set_title(f"Simulation Time: {current_time:.2f} seconds")
-                    
+
                     for rod_idx in range(n_visualized_rods):
                         inst_position, inst_radius = rod_history_unpacker(
                             rod_idx, time_idx

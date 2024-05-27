@@ -73,16 +73,16 @@ class DataPaths:
 class TerminalInfo:
     """
 
-        Attributes
-        ----------
-        end_status : bool
-            Indicate if simulation reached end.
-        <variable>_nan_status : bool
-            Indicate if NaN exists in <variable>. Only given when `check_nan` is True.
-        <variable>_steady_state_status : bool
-            Indicate if <variable> is in steady-state. Only given when `check_steady_state` is given.
-        max_velocity : float
-            Maximum velocity at the end of the run. Only given when `check_steady_state=1`.
+    Attributes
+    ----------
+    end_status : bool
+        Indicate if simulation reached end.
+    <variable>_nan_status : bool
+        Indicate if NaN exists in <variable>. Only given when `check_nan` is True.
+    <variable>_steady_state_status : bool
+        Indicate if <variable> is in steady-state. Only given when `check_steady_state` is given.
+    max_velocity : float
+        Maximum velocity at the end of the run. Only given when `check_steady_state=1`.
 
     """
 
@@ -94,7 +94,7 @@ class TerminalInfo:
         for name in self.__dir__():
             if name.endswith("status"):
                 messages.append(f"{name} = {getattr(self, name)}")
-        return '\n'.join(messages)
+        return "\n".join(messages)
 
     @property
     def combined_nan_status(self) -> bool:
@@ -124,7 +124,9 @@ class TerminalInfo:
         status_list = [
             getattr(self, name)
             for name in self.__dir__()
-            if name.endswith("status") and ("_steady_state_" in name) and ("combined_" not in name)
+            if name.endswith("status")
+            and ("_steady_state_" in name)
+            and ("combined_" not in name)
         ]
         return any(status_list)
 
@@ -250,7 +252,7 @@ class Environment:
 
         # Set action
         self.assy.set_actuation(action)
-        
+
         # Record previous-step
         if check_steady_state == 2:
             # fmt: off
@@ -268,8 +270,10 @@ class Environment:
         if not duration:
             duration = self.time_step
         with tqdm(
-            total=self.time + duration, mininterval=0.5, disable=disable_progress_bar,
-            bar_format = "{desc}: {percentage:.3f}%|{bar}| {n:.5f}/{total_fmt} [{elapsed}<{remaining}"
+            total=self.time + duration,
+            mininterval=0.5,
+            disable=disable_progress_bar,
+            bar_format="{desc}: {percentage:.3f}%|{bar}| {n:.5f}/{total_fmt} [{elapsed}<{remaining}",
         ) as pbar:
             while time < self.time + duration:
                 time = self.do_step(
@@ -389,7 +393,7 @@ class Environment:
 
     def render_video(
         self,
-        visualize_twist_angle:bool=False,
+        visualize_twist_angle: bool = False,
         **kwargs,
     ) -> None:
         """
@@ -411,7 +415,7 @@ class Environment:
             save_folder=save_folder,
             **kwargs,
         )
-        
+
         if visualize_twist_angle:
             visual_twist_with_surface(
                 self.data_rods,
@@ -424,7 +428,7 @@ class Environment:
 
         self.save_data("position")
 
-    def save_data(self, tag:Optional[str]=None) -> None:
+    def save_data(self, tag: Optional[str] = None) -> None:
         """save_data.
 
         Parameters
@@ -451,7 +455,6 @@ class Environment:
             director = np.array(rod["director"])
             directors.append(director)
         directors = np.asarray(directors)
-
 
         np.savez(
             path,

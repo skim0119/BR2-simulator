@@ -5,6 +5,7 @@ from elastica._boundary_conditions import ConstraintBase
 import numba
 from numba import njit
 
+
 class LastEndFixedRod(ConstraintBase):
     """
     This boundary condition class fixes one end of the rod. Currently,

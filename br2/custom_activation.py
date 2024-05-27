@@ -44,7 +44,7 @@ class PointForces(NoForces):
         self.location = location
 
     def apply_forces(self, system, time=0.0):
-        force_index = int(system.external_forces.shape[-1]*self.location)
+        force_index = int(system.external_forces.shape[-1] * self.location)
         self.compute_end_point_forces(
             system.external_forces,
             self.force,
