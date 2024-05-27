@@ -437,33 +437,27 @@ class Environment:
         else:
             filename = f"br2_data_{tag}.npz"
         path = os.path.join(self.paths.data, filename)
-        position_rod = np.array(self.data_rods[0]["position"])
-        position_rod = 0.5 * (position_rod[..., 1:] + position_rod[..., :-1])
-        position_rod_0 = position_rod
-        position_rod_1 = np.array(self.data_rods[1]["position"])
-        position_rod_1 = 0.5 * (position_rod_1[..., 1:] + position_rod_1[..., :-1])
-        position_rod_2 = np.array(self.data_rods[2]["position"])
-        position_rod_2 = 0.5 * (position_rod_2[..., 1:] + position_rod_2[..., :-1])          
+        time = np.array(self.data_rods[0]["time"])
 
-        director_rod_0 = np.array(self.data_rods[0]["director"])
-        director_rod_1 = np.array(self.data_rods[1]["director"])
-        director_rod_2 = np.array(self.data_rods[2]["director"])
-        center_line_0 = np.array(self.data_rods[0]["position"])
-        center_line_1 = np.array(self.data_rods[1]["position"])
-        center_line_2 = np.array(self.data_rods[2]["position"])
+        positions = []
+        for rod in self.data_rods:
+            position = np.array(rod["position"])
+            position = 0.5 * (position[..., 1:] + position[..., :-1])
+            positions.append(position)
+        positions = np.asarray(positions)
+
+        directors = []
+        for rod in self.data_rods:
+            director = np.array(rod["director"])
+            directors.append(director)
+        directors = np.asarray(directors)
+
+
         np.savez(
             path,
             time=np.array(self.data_rods[0]["time"]),
-            position_rod=position_rod,
-            position_rod_0=position_rod_0,
-            position_rod_1=position_rod_1,
-            position_rod_2=position_rod_2,
-            director_rod_0=director_rod_0,
-            director_rod_1=director_rod_1,
-            director_rod_2=director_rod_2,
-            center_line_0=center_line_0,
-            center_line_1=center_line_1,
-            center_line_2=center_line_2,
+            positions=positions,
+            directors=directors,
         )
 
     def close(self):
