@@ -230,7 +230,7 @@ class Environment:
         disable_progress_bar: bool = False,
         check_nan: bool = False,
         check_steady_state: Optional[int] = None,
-    ) -> Optional[TerminalInfo]:
+    ) -> TerminalInfo:
         """
         Run simulation for a duration given action.
 

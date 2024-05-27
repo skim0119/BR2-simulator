@@ -188,29 +188,30 @@ class FreeAssembly:
             start_y_position += seg_lengths[0]
 
             """Parallel Connection"""
-            print("connecting in parallel...")
-            outer_radius = rod_spec["outer_radius"]
-            base_length = rod_spec["base_length"]
-            E = rod_spec["youngs_modulus"]
-            n_elem = rod_spec["n_elements"]
-            k_connection = np.pi * outer_radius * E / n_elem * self.k_multiplier
-            nu_connection = base_length / n_elem * self.nu_multiplier
-            kt_connection = outer_radius / 2 * self.kt_multiplier
-            k_repulsive = self.k_repulsive
-            # print(f'  {k_connection=} {nu_connection=} {kt_connection=}')
-            for rod_i in range(len(seg_rods)):
-                first_rod_name = seg_rods[rod_i - 1]
-                second_rod_name = seg_rods[rod_i]
-                print(
-                    f"    connecting seg {seg_idx}: {first_rod_name} || {second_rod_name}"
-                )
-                self.add_parallel_connection(
-                    first_rod_name,
-                    second_rod_name,
-                    k=k_connection,
-                    nu=nu_connection,
-                    kt=kt_connection,
-                    k_repulsive=k_repulsive,
+            if len(seg_rods) > 1:
+                print("connecting in parallel...")
+                outer_radius = rod_spec["outer_radius"]
+                base_length = rod_spec["base_length"]
+                E = rod_spec["youngs_modulus"]
+                n_elem = rod_spec["n_elements"]
+                k_connection = np.pi * outer_radius * E / n_elem * self.k_multiplier
+                nu_connection = base_length / n_elem * self.nu_multiplier
+                kt_connection = outer_radius / 2 * self.kt_multiplier
+                k_repulsive = self.k_repulsive
+                # print(f'  {k_connection=} {nu_connection=} {kt_connection=}')
+                for rod_i in range(len(seg_rods)):
+                    first_rod_name = seg_rods[rod_i - 1]
+                    second_rod_name = seg_rods[rod_i]
+                    print(
+                        f"    connecting seg {seg_idx}: {first_rod_name} || {second_rod_name}"
+                    )
+                    self.add_parallel_connection(
+                        first_rod_name,
+                        second_rod_name,
+                        k=k_connection,
+                        nu=nu_connection,
+                        kt=kt_connection,
+                        k_repulsive=k_repulsive,
                 )
 
             if seg_idx > 0:
