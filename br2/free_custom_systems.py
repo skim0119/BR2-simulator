@@ -33,30 +33,16 @@ class FreeBendActuation(NoForces):
         """
         self.ramp_up_time = ramp_up_time
 
-    """ (deprecated)
-    def apply_forces(self, system, time: float = 0.0):
-        factor = min(1.0, time / self.ramp_up_time)
-        force_on_one_element = self.actuation_ref[0] * factor
-        tangents = system.tangents[...]
-        system.external_forces[..., 0] -= factor * 0.5 * force_on_one_element * tangents[..., 0]
-        system.external_forces[..., -1] += factor * 0.5 * force_on_one_element * tangents[..., -1]
-        system.external_forces[..., 1:-1] += (
-            factor * 0.5 * force_on_one_element
-            * (tangents[..., :-1] - tangents[..., 1:])
-        )
-    """
-
     def apply_torques(self, system, time: float = 0.0):
         factor = min(1.0, time / self.ramp_up_time)
         torque_mag = self.actuation_ref[0] * self.magnitude_scale * factor
         local_unit_vector = np.array([np.cos(self.z_angle), np.sin(self.z_angle), 0.0])
         torque = torque_mag * local_unit_vector
-        system.external_torques[..., -1] += torque
-        # system.external_torques[...,-1] += system.director_collection[...,-1] @ torque
-        """ Not used: (uniformly distributed torque) """
-        return
+        #system.external_torques[..., -1] += system.director_collection[...,-1] @ torque
+        #""" Not used: (uniformly distributed torque) """
+        #return
         n_elems = system.n_elems
-        torque_on_one_element = _batch_product_i_k_to_ik(torque, np.ones((n_elems)))
+        torque_on_one_element = _batch_product_i_k_to_ik(torque, np.ones((n_elems))) / n_elems
         system.external_torques += _batch_matvec(
             system.director_collection, torque_on_one_element
         )
@@ -122,7 +108,6 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         self.rev = 0
 
     def constrain_values(self, rod, time):
-        super().constrain_values(rod, time)
         self.restrict_position(
             rod.position_collection[..., 0],
             self.fixed_position,
