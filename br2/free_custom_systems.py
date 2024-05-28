@@ -38,14 +38,15 @@ class FreeBendActuation(NoForces):
         torque_mag = self.actuation_ref[0] * self.magnitude_scale * factor
         local_unit_vector = np.array([np.cos(self.z_angle), np.sin(self.z_angle), 0.0])
         torque = torque_mag * local_unit_vector
-        #system.external_torques[..., -1] += system.director_collection[...,-1] @ torque
+        #system.external_torques[..., -1] += torque
         #""" Not used: (uniformly distributed torque) """
         #return
         n_elems = system.n_elems
         torque_on_one_element = _batch_product_i_k_to_ik(torque, np.ones((n_elems))) / n_elems
-        system.external_torques += _batch_matvec(
-            system.director_collection, torque_on_one_element
-        )
+        #system.external_torques += _batch_matvec(
+        #    system.director_collection, torque_on_one_element
+        #)
+        system.external_torques += torque_on_one_element
 
 
 # Defining Variable Torque
