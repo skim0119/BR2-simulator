@@ -30,6 +30,7 @@ from br2.free_custom_systems import (
     FreeTwistActuation,
     FreeBaseEndSoftFixed,
 )
+from br2.custom_dissipation import AnalyticalLinearDamperV2
 
 
 # Set base elastica simulator class
@@ -314,9 +315,13 @@ class FreeAssembly:
         if "damping_constant" in rod_spec:
             damping_constant = rod_spec["damping_constant"]
             self.simulator.dampen(rod).using(
-                AnalyticalLinearDamper,
+                AnalyticalLinearDamperV2,
                 damping_constant=damping_constant,
                 time_step=self.env.time_step,
+            )
+            self.simulator.dampen(rod).using(
+                LaplaceDissipationFilter,
+                filter_order=5,
             )
 
         # Constrain one end of the rod (TODO : Modify for serial connection)

@@ -1,5 +1,5 @@
 { 
-    "Info": "GJM set of BR2 properties",
+    "Info": "FREE properties",
     "DefaultParams": {
         "n_elements"       : 40,
         "direction"        : [0.0,1.0,0.0],
@@ -8,7 +8,7 @@
         "outer_radius"     : 0.005,
         "inner_radius"     : 0.003,
         "density"          : 1000,
-        "damping_constant" : 0.5,
+        "damping_constant" : 25,
         "youngs_modulus"   : 1.00e6,
         "shear_modulus"    : 6.66e6
     },
