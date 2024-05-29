@@ -95,9 +95,11 @@ class FreeAssembly:
         
         # Scale by modulus
         self.k_multiplier = kwargs.get("k_multiplier", 0.166) * 1e6
-        self.nu_multiplier = kwargs.get("nu_multiplier", 0)
+        self.nu_multiplier = kwargs.get("nu_multiplier", 0) * 1e6
         self.kt_multiplier = kwargs.get("kt_multiplier", 1)
         self.k_repulsive_multiplier = kwargs.get("k_repulsive", 2) * 1e6
+        # DEBUG
+        print(f"  {self.k_multiplier=} {self.nu_multiplier=} {self.kt_multiplier=} {self.k_repulsive_multiplier=}")
 
     def save_state(self, **kwargs):
         # kwargs: directory, time, verbose

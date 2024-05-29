@@ -22,14 +22,16 @@ def main():
     psi2Nm2 = 6895
 
     # Actuation Profile
-    action = {"action1": 30 * psi2Nm2}
+    action = {"action1": 60 * psi2Nm2}
 
     # Prepare environment
-    env = Environment(run_tag=args.tag)
+    env = Environment(run_tag=args.tag, rendering_fps=300)
     env.reset(
         rod_database_path="database/rod_library.json",
         assembly_config_path="assembly/single_br2_twist.json",
         gravity=True,
+        k_repulsive=10,  # Default 2
+        nu_multiplier=1,  # Default 0
     )
 
     # Simulation
