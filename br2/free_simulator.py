@@ -92,12 +92,12 @@ class FreeAssembly:
 
         # Parameter
         self.toggle_gravity = gravity
-
-        ## Debut
-        self.k_multiplier = kwargs.get("t_multiplier", 1)  # * 1.0e-2
-        self.nu_multiplier = kwargs.get("nu_multiplier", 1) * 1.0e-3
-        self.kt_multiplier = kwargs.get("kt_multiplier", 1)  # * 0.0 #1e0
-        self.k_repulsive = kwargs.get("k_repulsive", 1)
+        
+        # Scale by modulus
+        self.k_multiplier = kwargs.get("k_multiplier", 0.166) * 1e6
+        self.nu_multiplier = kwargs.get("nu_multiplier", 0)
+        self.kt_multiplier = kwargs.get("kt_multiplier", 1)
+        self.k_repulsive_multiplier = kwargs.get("k_repulsive", 2) * 1e6
 
     def save_state(self, **kwargs):
         # kwargs: directory, time, verbose
@@ -203,11 +203,7 @@ class FreeAssembly:
                 base_length = rod_spec["base_length"]
                 E = rod_spec["youngs_modulus"]
                 n_elem = rod_spec["n_elements"]
-                k_connection = np.pi * outer_radius * E / n_elem * self.k_multiplier
-                nu_connection = base_length / n_elem * self.nu_multiplier
-                kt_connection = outer_radius / 2 * self.kt_multiplier
-                k_repulsive = self.k_repulsive
-                # print(f'  {k_connection=} {nu_connection=} {kt_connection=}')
+                nu_connection = base_length / n_elem * self.nu_multiplier  # TODO: fix this
                 for rod_i in range(len(seg_rods)):
                     first_rod_name = seg_rods[rod_i - 1]
                     second_rod_name = seg_rods[rod_i]
@@ -217,11 +213,8 @@ class FreeAssembly:
                     self.add_parallel_connection(
                         first_rod_name,
                         second_rod_name,
-                        k=k_connection,
                         nu=nu_connection,
-                        kt=kt_connection,
-                        k_repulsive=k_repulsive,
-                )
+                    )
 
             if seg_idx > 0:
                 """Serial Connection"""
@@ -412,32 +405,37 @@ class FreeAssembly:
         )
         return callback_params
 
-    def glue_rods_surface_connection(self, rod1, rod2, k, nu, kt, k_repulsive):
-
+    def glue_rods_surface_connection(self, rod_one, rod_two, nu):
         (
             rod_one_direction_vec_in_material_frame,
             rod_two_direction_vec_in_material_frame,
             offset_btw_rods,
         ) = get_connection_vector_straight_straight_rod(
-            rod_one=rod1,
-            rod_two=rod2,
-            rod_one_idx=(0, rod1.n_elems),
-            rod_two_idx=(0, rod2.n_elems),
+            rod_one=rod_one,
+            rod_two=rod_two,
+            rod_one_idx=(0, rod_one.n_elems),
+            rod_two_idx=(0, rod_two.n_elems),
         )
 
-        n_elems = rod1.n_elems
+        n_elems = rod_one.n_elems
 
         for i in range(n_elems):
+            k_conn = (
+                rod_one.radius[i] * rod_two.radius[i]
+                / (rod_one.radius[i] + rod_two.radius[i])
+                * rod_one.lengths[i] / (rod_one.radius[i] + rod_two.radius[i])
+            )
+
             self.simulator.connect(
-                first_rod=rod1,
-                second_rod=rod2,
+                first_rod=rod_one,
+                second_rod=rod_two,
                 first_connect_idx=i,
                 second_connect_idx=i,
             ).using(
                 SurfaceJointSideBySide,
-                k=k,
+                k=k_conn*self.k_multiplier,
                 nu=nu,
-                k_repulsive=k_repulsive,
+                k_repulsive=k_conn*self.k_repulsive_multiplier,
                 rod_one_direction_vec_in_material_frame=rod_one_direction_vec_in_material_frame[
                     ..., i
                 ],
@@ -447,22 +445,22 @@ class FreeAssembly:
                 offset_btw_rods=offset_btw_rods[i],
             )
 
-    def tip_to_base_connection(self, rod1, rod2, k, nu, kt):
+    def tip_to_base_connection(self, rod_one, rod_two, k, nu, kt):
         rod1_elem_pos = 0.5 * (
-            rod1.position_collection[..., -1] + rod1.position_collection[..., -2]
+            rod_one.position_collection[..., -1] + rod_one.position_collection[..., -2]
         )
         rod2_elem_pos = 0.5 * (
-            rod2.position_collection[..., 0] + rod2.position_collection[..., 1]
+            rod_two.position_collection[..., 0] + rod_two.position_collection[..., 1]
         )
-        rod1_Q = rod1.director_collection[..., -1]
-        rod2_Q = rod2.director_collection[..., 0]
+        rod1_Q = rod_one.director_collection[..., -1]
+        rod2_Q = rod_two.director_collection[..., 0]
         distance = np.linalg.norm(rod2_elem_pos - rod1_elem_pos)
         connection_lab = (rod2_elem_pos - rod1_elem_pos) / distance
         rod1_rd2_local = rod1_Q @ connection_lab  # local frame
         rod2_rd2_local = rod2_Q @ (-connection_lab)  # local frame
 
         self.simulator.connect(
-            first_rod=rod1, second_rod=rod2, first_connect_idx=-1, second_connect_idx=0
+            first_rod=rod_one, second_rod=rod_two, first_connect_idx=-1, second_connect_idx=0
         ).using(
             TipToTipStraightJoint,
             k=k,
