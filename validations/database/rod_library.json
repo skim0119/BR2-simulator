@@ -10,7 +10,7 @@
         "density"          : 1000,
         "damping_constant" : 25,
         "youngs_modulus"   : 1.00e6,
-        "shear_modulus"    : 6.66e6
+        "shear_modulus"    : 0.33e6
     },
     "Rods": {
         "RodBend": {

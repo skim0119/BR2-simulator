@@ -86,10 +86,9 @@ class FreeAssembly:
         self.toggle_gravity = gravity
 
         ## Debut
-        self.k_multiplier = kwargs.get("t_multiplier", 1)  # * 1.0e-2
-        self.nu_multiplier = kwargs.get("nu_multiplier", 1) * 1.0e-3
-        self.kt_multiplier = kwargs.get("kt_multiplier", 1)  # * 0.0 #1e0
-        self.k_repulsive = kwargs.get("k_repulsive", 1)
+        self.k_multiplier = kwargs.get("t_multiplier", 1)
+        self.nu_multiplier = kwargs.get("nu_multiplier", 1)
+        self.k_repulsive = kwargs.get("k_repulsive", 1) * 10
 
     def save_state(self, **kwargs):
         # kwargs: directory, time, verbose
@@ -197,21 +196,22 @@ class FreeAssembly:
                 n_elem = rod_spec["n_elements"]
                 k_connection = np.pi * outer_radius * E / n_elem * self.k_multiplier
                 nu_connection = base_length / n_elem * self.nu_multiplier
-                kt_connection = outer_radius / 2 * self.kt_multiplier
                 k_repulsive = self.k_repulsive
-                # print(f'  {k_connection=} {nu_connection=} {kt_connection=}')
+                # print(f'  {k_connection=} {nu_connection=}')
                 for rod_i in range(len(seg_rods)):
                     first_rod_name = seg_rods[rod_i - 1]
                     second_rod_name = seg_rods[rod_i]
                     print(
                         f"    connecting seg {seg_idx}: {first_rod_name} || {second_rod_name}"
                     )
+                    print(
+                        f"        {k_connection=}, {nu_connection=}, {k_repulsive=}"
+                    )
                     self.add_parallel_connection(
                         first_rod_name,
                         second_rod_name,
                         k=k_connection,
                         nu=nu_connection,
-                        kt=kt_connection,
                         k_repulsive=k_repulsive,
                 )
 
@@ -404,7 +404,7 @@ class FreeAssembly:
         )
         return callback_params
 
-    def glue_rods_surface_connection(self, rod1, rod2, k, nu, kt, k_repulsive):
+    def glue_rods_surface_connection(self, rod1, rod2, k, nu, k_repulsive):
 
         (
             rod_one_direction_vec_in_material_frame,

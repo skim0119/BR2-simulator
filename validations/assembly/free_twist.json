@@ -1,0 +1,19 @@
+{ 
+    "CaseID": 1,
+    "Date": "2024-05-27",
+    "Info": "Single-bend FREE actuation test",
+    "Segments": {
+        "seg1": {
+            "rod_order": ["RodRightTwist"],
+            "base_position": [
+                [0.0, 0.0]
+            ],
+            "y-rotation":[0.0]
+        }
+    },
+    "Activations": {
+        "action1": [
+            ["seg1", 0]
+        ]
+    }
+}
