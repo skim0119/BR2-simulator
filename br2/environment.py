@@ -141,7 +141,9 @@ class Environment:
     time_step : float
         Simulation timestep. Faster time-step could reduce the simulation walltime,
         but the simulation may be unstable. (default=2.0e-5)
-    final_time : Optional[float]
+    capture_interval : Optional[tuple[float, float]]
+        Interval for capturing the data. (default=None)
+        ex. (0.3, 0.5)
     """
 
     def __init__(
@@ -149,7 +151,7 @@ class Environment:
         run_tag: str,
         rendering_fps: int = 25,
         time_step: float = 2.0e-5,
-        final_time: Optional[float] = None,
+        capture_interval: Optional[tuple[float, float]] = None,
     ):
         # Integrator type (pyelastica==0.2.2 only provide PositionVerlet)
         self.StatefulStepper = PositionVerlet()
@@ -159,15 +161,14 @@ class Environment:
         self.paths.initialize()
 
         # Simulation parameters
-        self.final_time = final_time  # TODO: either remove or implement stopper
         self.time_step = time_step
 
         # Recording speed
-        self.rendering_fps = rendering_fps
         self.step_skip = int(
-            1.0 / (self.rendering_fps * self.time_step)
-        )  # match rendering fps to physical time
-        self.capture_interval = None  # TODO: ex.(0.3, 0.5)
+            1.0 / (rendering_fps * self.time_step)
+        )
+        self.rendering_fps = rendering_fps
+        self.capture_interval = capture_interval
 
         # Rod
         self.shearable_rods = {}
@@ -393,12 +394,17 @@ class Environment:
 
     def render_video(
         self,
-        visualize_twist_angle: bool = False,
+        visualize_twist_angle: bool=False,
+        max_fps: bool=None,
         **kwargs,
     ) -> None:
         """
         Make video 3D rod movement in time.
         """
+        if max_fps is not None and max_fps < self.rendering_fps:
+            _rendering_fps = max_fps
+        else:
+            _rendering_fps = self.rendering_fps
 
         filename_video = "br2_simulation"
         save_folder = self.paths.renderings
@@ -410,7 +416,7 @@ class Environment:
         plot_video_with_surface(
             self.data_rods,
             video_name=filename_video,
-            fps=self.rendering_fps,
+            fps=_rendering_fps,
             step=1,
             save_folder=save_folder,
             **kwargs,
@@ -420,7 +426,7 @@ class Environment:
             visual_twist_with_surface(
                 self.data_rods,
                 video_name=filename_video,
-                fps=self.rendering_fps,
+                fps=_rendering_fps,
                 step=1,
                 save_folder=save_folder,
                 **kwargs,
