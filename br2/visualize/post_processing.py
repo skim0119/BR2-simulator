@@ -5,15 +5,11 @@ from matplotlib.colors import to_rgb
 import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import proj3d, Axes3D
 
-# from tqdm import tqdm
+from tqdm import tqdm
 
 from typing import Dict, Sequence
 
 # plt.rcParams.update({"font.size": 22})
-
-
-def tqdm(obj):  # tqdm suppressor
-    return obj
 
 
 def plot_video_2d(
