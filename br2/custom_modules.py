@@ -16,8 +16,6 @@ import functools
 
 class MemoryBlockConnections(Connections):
     def __init__(self):
-        # super(Connections, self).__init__()
-        # self._connections = []
         self._connections = []
         super(Connections, self).__init__()
         self._feature_group_finalize.append(self._finalize_connections)

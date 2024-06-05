@@ -19,7 +19,9 @@ from br2.visualize.post_processing import plot_video_with_surface
 from br2.visualize.twist_angle import visual_twist_with_surface
 
 from br2.free_simulator import FreeAssembly
+from br2.custom_callback import BlenderCallback
 
+import bsr
 
 @dataclass
 class DataPaths:
@@ -152,6 +154,7 @@ class Environment:
         rendering_fps: int = 25,
         time_step: float = 2.0e-5,
         capture_interval: Optional[tuple[float, float]] = None,
+        export_blender: bool = False,
     ):
         # Integrator type (pyelastica==0.2.2 only provide PositionVerlet)
         self.StatefulStepper = PositionVerlet()
@@ -169,6 +172,9 @@ class Environment:
         )
         self.rendering_fps = rendering_fps
         self.capture_interval = capture_interval
+        self.export_blender = export_blender
+        if self.export_blender:
+            bsr.clear()
 
         # Rod
         self.shearable_rods = {}
@@ -214,6 +220,11 @@ class Environment:
         self.data_rods = self.assy.generate_callbacks(
             self.step_skip, time_interval=self.capture_interval
         )  # [seg,rod]
+        if self.export_blender:
+            self.assy.generate_callbacks(
+                self.step_skip, time_interval=self.capture_interval, callback_class=BlenderCallback
+            )  # [seg,rod]
+
         # Finalize simulation environment. After finalize, you cannot add
         # any forcing, constrain or call back functions
         self.simulator.finalize()
@@ -469,8 +480,85 @@ class Environment:
             directors=directors,
         )
 
+    def debug_data(self):
+        import pandas as pd
+        save_folder = self.paths.renderings
+
+        def find_max_val(data):
+            if data.ndim == 3:
+                data = np.linalg.norm(data, axis=1)
+            isnan = np.isnan(data).any(axis=1)
+            max_val = np.nanmax(data, axis=1)
+            median_val = np.nanmedian(data, axis=1)
+
+            return max_val, median_val, isnan
+
+        for ridx, data_rod in enumerate(self.data_rods):
+            time = np.array(data_rod["time"])
+            step = np.array(data_rod["step"])
+            pos, pos_median, pos_isnan = find_max_val(np.array(data_rod["position"]))
+            vel, vel_median, vel_isnan = find_max_val(np.array(data_rod["velocity"]))
+            acc, acc_median, acc_isnan = find_max_val(np.array(data_rod["acceleration"]))
+            omega, omega_median, omega_isnan = find_max_val(np.array(data_rod["omega"]))
+            alpha, alpha_median, alpha_isnan = find_max_val(np.array(data_rod["alpha"]))
+            ext_force, ext_force_median, ext_force_isnan = find_max_val(np.array(data_rod["external_forces"]))
+            int_force, int_force_median, int_force_isnan = find_max_val(np.array(data_rod["internal_forces"]))
+            ext_torque, ext_torque_median, ext_torque_isnan = find_max_val(np.array(data_rod["external_torques"]))
+            int_torque, int_torque_median, int_torque_isnan = find_max_val(np.array(data_rod["internal_torques"]))
+            dilatation, dilatation_median, dilatation_isnan = find_max_val(np.array(data_rod["dilatation"]))
+            radius, radius_median, radius_isnan = find_max_val(np.array(data_rod["radius"]))
+            kappa, kappa_median, kappa_isnan = find_max_val(np.array(data_rod["kappa"]))
+            sigma, sigma_median, sigma_isnan = find_max_val(np.array(data_rod["sigma"]))
+            df = pd.DataFrame({
+                "time": time,
+                "step": step,
+                "pos": pos,
+                "pos_median": pos_median,
+                "pos_isnan": pos_isnan,
+                "vel": vel,
+                "vel_median": vel_median,
+                "vel_isnan": vel_isnan,
+                "acc": acc,
+                "acc_median": acc_median,
+                "acc_isnan": acc_isnan,
+                "omega": omega,
+                "omega_median": omega_median,
+                "omega_isnan": omega_isnan,
+                "alpha": alpha,
+                "alpha_median": alpha_median,
+                "alpha_isnan": alpha_isnan,
+                "ext_force": ext_force,
+                "ext_force_median": ext_force_median,
+                "ext_force_isnan": ext_force_isnan,
+                "int_force": int_force,
+                "int_force_median": int_force_median,
+                "int_force_isnan": int_force_isnan,
+                "ext_torque": ext_torque,
+                "ext_torque_median": ext_torque_median,
+                "ext_torque_isnan": ext_torque_isnan,
+                "int_torque": int_torque,
+                "int_torque_median": int_torque_median,
+                "int_torque_isnan": int_torque_isnan,
+                "dilatation": dilatation,
+                "dilatation_median": dilatation_median,
+                "dilatation_isnan": dilatation_isnan,
+                "radius": radius,
+                "radius_median": radius_median,
+                "radius_isnan": radius_isnan,
+                "kappa": kappa,
+                "kappa_median": kappa_median,
+                "kappa_isnan": kappa_isnan,
+                "sigma": sigma,
+                "sigma_median": sigma_median,
+                "sigma_isnan": sigma_isnan,
+            })
+            df.to_csv(os.path.join(save_folder, f"data_rod_{ridx}_debug.csv"))
+
     def close(self):
         """
         Close the simulator.
         """
-        pass
+        save_folder = self.paths.renderings
+        blender_path = os.path.join(save_folder, "rendering.blend")
+        bsr.save(blender_path)
+        
