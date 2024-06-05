@@ -7,9 +7,8 @@ from elastica._linalg import _batch_cross, _batch_dot, _batch_norm, _batch_matve
 from elastica._linalg import _batch_product_i_k_to_ik
 from elastica.boundary_conditions import ConstraintBase
 
-from br2.legacy_surface_connection_parallel_rod_numba import (
+from br2.linalg import (
     _single_inv_rotate,
-    _single_get_rotation_matrix,
 )
 
 import numpy as np
@@ -85,7 +84,7 @@ class FreeTwistActuation(NoForces):
         torque = self.actuation_ref[0] * self.scale * self.direction * factor
         n_elems = system.n_elems
         torques = _batch_product_i_k_to_ik(torque, np.ones((n_elems))) / n_elems
-        system.external_torques += torques
+        system.external_torques[..., 2:-2] += torques[..., 2:-2]
 
 
 class FreeBaseEndSoftFixed(ConstraintBase):
@@ -109,6 +108,9 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         self.rev = 0
 
     def constrain_values(self, rod, time):
+        rod.position_collection[..., 0] = self.fixed_position
+        rod.director_collection[..., 0] = self.fixed_directors
+        return
         self.restrict_position(
             rod.position_collection[..., 0],
             self.fixed_position,
@@ -117,8 +119,6 @@ class FreeBaseEndSoftFixed(ConstraintBase):
             self.k,
             self.nu,
         )
-        rod.director_collection[..., 0] = self.fixed_directors
-        return
         self.rev = self.restrict_orientation(
             self.kt,
             rod.director_collection[..., 0],
@@ -200,4 +200,4 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         # Add torque
         rod_external_torques[..., 0] += torque_on_rod_material_frame
 
-        return 0  # np.fix(new_theta / (2*np.pi))
+        #return 0  # np.fix(new_theta / (2*np.pi))
