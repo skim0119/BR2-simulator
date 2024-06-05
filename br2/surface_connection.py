@@ -98,7 +98,6 @@ class SurfaceJointSideBySide(FreeJoint):
     # Apply force is same as free joint
     def apply_forces(self, system_one, index_one, system_two, index_two):
         # TODO: documentation
-
         (
             self.rod_one_rd2,
             self.rod_two_rd2,
@@ -196,19 +195,25 @@ class SurfaceJointSideBySide(FreeJoint):
         spring_force = k * (distance_vector)
 
         # Damping force
-        rod_one_element_velocity = 0.5 * (
-            rod_one_velocity_collection[:, index_one]
-            + rod_one_velocity_collection[:, index_one + 1]
-        )
-        rod_two_element_velocity = 0.5 * (
-            rod_two_velocity_collection[:, index_two]
-            + rod_two_velocity_collection[:, index_two + 1]
-        )
-        relative_velocity = rod_two_element_velocity - rod_one_element_velocity
-        damping_force = nu * relative_velocity
+        #rod_one_element_velocity = 0.5 * (
+        #    rod_one_velocity_collection[:, index_one]
+        #    + rod_one_velocity_collection[:, index_one + 1]
+        #)
+        #rod_two_element_velocity = 0.5 * (
+        #    rod_two_velocity_collection[:, index_two]
+        #    + rod_two_velocity_collection[:, index_two + 1]
+        #)
+        #relative_velocity = rod_two_element_velocity - rod_one_element_velocity
+        #damping_force = nu * relative_velocity
+        for k in range(index_one.shape[0]):
+            v1 = rod_one_velocity_collection[:, index_one[k]]
+            v2 = rod_two_velocity_collection[:, index_two[k]]
+            d = nu[k]*(v1-v2)/2.
+            rod_one_velocity_collection[:, index_one[k]] -= d
+            rod_two_velocity_collection[:, index_two[k]] += d
 
         # Compute the total force
-        total_force = spring_force + damping_force
+        total_force = spring_force  # + damping_force
 
         # Compute contact forces. Contact forces are applied in the case one rod penetrates to the other, in that case
         # we apply a repulsive force.
