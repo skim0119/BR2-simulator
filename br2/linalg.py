@@ -15,11 +15,6 @@ from elastica._linalg import (
     _batch_matmul,
     _batch_matrix_transpose,
 )
-from elastica.interaction import (
-    elements_to_nodes_inplace,
-    node_to_element_position,
-    node_to_element_velocity,
-)
 
 from elastica._rotations import _inv_skew_symmetrize
 

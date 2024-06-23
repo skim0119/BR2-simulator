@@ -19,9 +19,7 @@ from br2.visualize.post_processing import plot_video_with_surface
 from br2.visualize.twist_angle import visual_twist_with_surface
 
 from br2.free_simulator import FreeAssembly
-from br2.custom_callback import BlenderCallback
-
-import bsr
+from br2.custom_callback import BlenderRodCallback
 
 @dataclass
 class DataPaths:
@@ -174,7 +172,9 @@ class Environment:
         self.capture_interval = capture_interval
         self.export_blender = export_blender
         if self.export_blender:
-            bsr.clear()
+            import bsr
+
+            bsr.clear_mesh_objects()
 
         # Rod
         self.shearable_rods = {}
@@ -222,7 +222,7 @@ class Environment:
         )  # [seg,rod]
         if self.export_blender:
             self.assy.generate_callbacks(
-                self.step_skip, time_interval=self.capture_interval, callback_class=BlenderCallback
+                self.step_skip, time_interval=self.capture_interval, callback_class=BlenderRodCallback
             )  # [seg,rod]
 
         # Finalize simulation environment. After finalize, you cannot add
@@ -560,5 +560,8 @@ class Environment:
         """
         save_folder = self.paths.renderings
         blender_path = os.path.join(save_folder, "rendering.blend")
-        bsr.save(blender_path)
+
+        if self.export_blender:
+            import bsr
+            bsr.save(blender_path)
         

@@ -1,15 +1,14 @@
-__all__ = ["BlenderCallback"]
+__all__ = ["BlenderRodCallback"]
 
 import bpy
 import numpy as np
 from elastica import CallBackBaseClass
 from elastica.typing import RodType
 
-import bsr
-from bsr.geometry import Cylinder, Sphere
+from bsr import Rod
 
 
-class BlenderCallback(CallBackBaseClass):
+class BlenderRodCallback(CallBackBaseClass):
     """
     PyElastica callback to save rod state to Blender.
     """
@@ -19,26 +18,30 @@ class BlenderCallback(CallBackBaseClass):
         self.every = step_skip
         self.time_interval = time_interval
         self.key_frame = 0
-        self.bpy_objs = bsr.Rod()
+        self.bpy_objs: Rod
         self.stop = False
 
     def make_callback(
         self, system: RodType, time: np.floating, current_step: int
     ) -> None:
-        if current_step % self.every != 0:
+        if self.stop or current_step % self.every != 0:
             return
         if self.time_interval is not None and (
             time < self.time_interval[0] or time > self.time_interval[1]
         ):
             return
-        if np.isnan(system.position_collection).any():
+        if np.isnan(system.position_collection).any() or np.isnan(system.radius).any():
             self.stop = True
             return
-        if self.stop:
-            return
-        self.bpy_objs.update(
-            keyframe=self.key_frame,
-            positions=system.position_collection,
-            radii=system.radius*2,
-        )
+        if current_step == 0:
+            self.bpy_objs = Rod(
+                system.position_collection,
+                system.radius,
+            )
+        else:
+            self.bpy_objs.update_states(
+                positions=system.position_collection,
+                radii=system.radius,
+            )
+        self.bpy_objs.set_keyframe(self.key_frame)
         self.key_frame += 1

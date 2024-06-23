@@ -10,8 +10,8 @@ from elastica.timestepper import extend_stepper_interface
 from elastica.external_forces import (
     UniformTorques,
     # EndPointTorques,
+    GravityForces,
 )
-from elastica.external_forces import GravityForces
 
 
 from elastica._calculus import _clip_array
@@ -19,6 +19,7 @@ from elastica._linalg import _batch_cross, _batch_dot, _batch_norm, _batch_matve
 from elastica._linalg import _batch_product_i_k_to_ik
 from elastica.restart import save_state, load_state
 #from elastica.experimental.connection_contact_joint.parallel_connection import (
+from br2.rod.cosserat_rod import FreeCosseratRod
 from br2.surface_connection import (
     SurfaceJointSideBySide,
     get_connection_vector_straight_straight_rod,
@@ -28,14 +29,17 @@ from br2.free_custom_systems import (
     FreeBendActuation,
     FreeTwistActuation,
     FreeBaseEndSoftFixed,
+    FreeCombinedActuation,
 )
 from br2.custom_dissipation import AnalyticalLinearDamperV2, LaplaceDissipationFilterV2
-from br2.custom_modules import MemoryBlockConnections
+from br2.modules.base_system import BaseSystemCollection as CustomBaseSystemCollection
+from br2.modules.base_system import BaseSystemCollection as CustomBaseSystemCollection
+from br2.modules.block_connections import MemoryBlockConnections
 
 
 # Set base elastica simulator class
 class BR2Simulator(
-    BaseSystemCollection,
+    CustomBaseSystemCollection,
     Constraints,
     #Connections,
     MemoryBlockConnections,
@@ -79,8 +83,13 @@ class FreeCallback(CallBackBaseClass):
         self.callback_params["lengths"].append(system.lengths.copy())
         self.callback_params["dilatation"].append(system.dilatation.copy())
         self.callback_params["radius"].append(system.radius.copy())
-        self.callback_params["com"].append(system.compute_position_center_of_mass())
+        self.callback_params["com"].append(system.compute_position_center_of_mass().copy())
         # self.callback_params["vcom"].append(system.compute_velocity_center_of_mass())
+
+        self.callback_params["volume"].append(system.volume.copy())
+        self.callback_params["alpha_angle"].append(system.alpha_angle.copy())
+        self.callback_params["beta_angle"].append(system.beta_angle.copy())
+        self.callback_params["delta_turn"].append(system.delta_turn.copy())
 
 
 class FreeAssembly:
@@ -156,9 +165,6 @@ class FreeAssembly:
 
                 rod_spec = rod_specs[rod_type].copy()
 
-                # TODO: DEBUG nu
-                # rod_spec['nu'] = 10**lognu
-
                 rod_spec["direction"] = np.array(rod_spec["direction"])
                 rod_spec["normal"] = np.array(rod_spec["normal"])
                 seg_lengths.append(rod_spec["base_length"])
@@ -168,17 +174,21 @@ class FreeAssembly:
                 rod_pos = np.insert(rod_pos, longitudinal_index, start_y_position)
                 rod_spec["start"] = rod_pos
                 rod_spec["is_first_segment"] = True if seg_idx == 0 else False
-                rod_spec["base_radius"] = rod_spec[
-                    "outer_radius"
-                ]  # TODO:  - rod_spec['inner_radius']
-                # rod_spec['base_radius'] = np.sqrt(
-                #                            (rod_i_spec['outer_radius'] ** 2 * np.pi - rod_i_spec['inner_radius'] ** 2 * np.pi) / np.pi)
+                rod_spec["base_radius"] = rod_spec["outer_radius"]
+
+                # Set fiber angles
                 if "gamma" in rod_spec:
                     rod_spec["gamma"] = [
                         angle + y_rotation for angle in rod_spec["gamma"]
                     ]
+                else:
+                    rod_spec["gamma"] = []
+                if "alpha" in rod_spec:
+                    rod_spec["alpha_fiber_angle"] = rod_spec["alpha"]
+                if "beta" in rod_spec:
+                    rod_spec["beta_fiber_angle"] = rod_spec["beta"]
 
-                """link activation"""
+                # link activation
                 actuation_name = None
                 for _actuation_name, rod_list in activations.items():
                     for data in rod_list:
@@ -276,7 +286,7 @@ class FreeAssembly:
 
     def create_rod(self, name, is_first_segment=True, verbose=False, **rod_spec):
         # Create new rod
-        rod = CosseratRod.straight_rod(**rod_spec)
+        rod = FreeCosseratRod.straight_rod(**rod_spec)
         rod.outer_radius = rod_spec["outer_radius"]
         rod.inner_radius = rod_spec["inner_radius"]
         self.free[name] = rod
@@ -330,6 +340,7 @@ class FreeAssembly:
         return rod
 
     def add_angled_fibers(self, rod, actuation_ref, fiber_angles: list):
+        # TODO: Deprecated. Remove later
         for alpha in fiber_angles:
             angle = alpha * np.pi / 180
             scale = (
@@ -352,16 +363,39 @@ class FreeAssembly:
                 scale=scale,
             )
 
-    def add_free(self, name, actuation_name, alpha=[], beta=[], gamma=[], **rod_spec):
+    def add_elongation_force(self, rod, actuation_ref):
+        #scale = np.pi * rod.inner_radius ** 2
+        scale = 1. #np.pi * rod.inner_radius ** 2
+        print(f"  actuation addded: elongation scale {scale}")
+        self.simulator.add_forcing_to(rod).using(
+            FreeCombinedActuation,
+            actuation_ref,
+            scale=scale,
+        )
+
+    def add_free(self, name, actuation_name, alpha:float, beta:float, gamma:list[float], **rod_spec):
         # Create rod
         rod = self.create_rod(name, **rod_spec)
         actuation_ref = self.get_actuation_reference(actuation_name)
 
         # Add fiber
         if actuation_ref is not None:
-            self.add_angled_fibers(rod, actuation_ref, alpha)
-            self.add_angled_fibers(rod, actuation_ref, beta)
-            self.add_straight_fibers(rod, actuation_ref, gamma)
+            scale = 1.0  # TODO: maybe remove later
+            self.simulator.add_forcing_to(rod).using(
+                FreeCombinedActuation,
+                actuation_ref,
+                scale=scale,
+            )
+            if len(gamma) > 0:
+                self.add_straight_fibers(rod, actuation_ref, gamma)
+
+            # TODO: Remove below later
+            #if len(alpha) == 0 and len(beta) == 0 and len(gamma) == 0:
+            #    self.add_elongation_force(rod, actuation_ref)
+            #else:
+            #    self.add_angled_fibers(rod, actuation_ref, alpha)
+            #    self.add_angled_fibers(rod, actuation_ref, beta)
+            #    self.add_straight_fibers(rod, actuation_ref, gamma)
 
         return rod
 

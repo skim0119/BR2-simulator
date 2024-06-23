@@ -201,3 +201,75 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         rod_external_torques[..., 0] += torque_on_rod_material_frame
 
         #return 0  # np.fix(new_theta / (2*np.pi))
+
+
+class FreeCombinedActuation(NoForces):
+    """
+    Based on B. Joshua 2013
+    """
+    def __init__(self, actuation_ref, scale, ramp_up_time=0.2):
+        """
+
+        Parameters
+        ----------
+        actuation_ref: list
+            Pressure
+        scale: float
+        ramp_up_time: float
+        """
+        self.actuation_ref = actuation_ref
+        self.scale = scale
+        self.ramp_up_time = ramp_up_time
+
+        self.direction = np.array([0.0, 0.0, 1.0])  # Rod always in tangent
+
+    def apply_forces(self, system: "FreeCosseratRod", time):
+        factor = min(1.0, time / self.ramp_up_time)
+        self.nb_apply_forces_and_torques(
+            rod_external_forces=system.external_forces,
+            rod_external_torques=system.external_torques,
+            pressure=self.actuation_ref[0] * self.scale * factor,
+            radius=system.radius,
+            alpha_angle=system.alpha_angle,
+            beta_angle=system.beta_angle,
+            tangents=system.tangents,
+            n_elems=system.n_elems,
+            skip_element_pre=2,
+            skip_element_post=2,
+        )
+
+    @staticmethod
+    @njit(cache=True)
+    def nb_apply_forces_and_torques(rod_external_forces, rod_external_torques, pressure, radius, alpha_angle, beta_angle, tangents, n_elems, skip_element_pre, skip_element_post):
+        # if alpha or beta is nan, breakpoint
+        #if np.isnan(rod_external_forces).any() or np.isnan(beta_angle).any():
+        #    breakpoint()
+        Sa = np.sin(alpha_angle)
+        Sb = np.sin(beta_angle)
+        Ca = np.cos(alpha_angle)
+        Cb = np.cos(beta_angle)
+        Sa_b = np.sin(alpha_angle-beta_angle)
+        pSaSb = Sa*Sb+2*Ca*Cb # Pitch * sin(a) * sin(b)
+
+        # Compute axial force per elements
+        F_scale = (pSaSb * Sa * Sb * Sa_b ** 2) / ((Sa * Sb * Sa_b) ** 2 + (Sa**2 - Sb**2)**2)
+        force_on_one_element = pressure * np.pi * radius**2 * F_scale / n_elems
+
+        # Compute moment
+        M_scale = (pSaSb * Sa_b * (Sa**2 - Sb**2)) / ((Sa * Sb * Sa_b) ** 2 + (Sa**2 - Sb**2)**2)
+        torque_on_one_element = pressure * np.pi * radius**3 * M_scale / n_elems
+
+        #print(f"Force: {force_on_one_element.max()}, Torque: {torque_on_one_element.max()}")
+        #print(f"alpha: {np.rad2deg(alpha_angle.min())}-{np.rad2deg(alpha_angle.max())}, beta: {np.rad2deg(beta_angle.min())}-{np.rad2deg(beta_angle.max())}")
+
+        for i in range(skip_element_pre, n_elems-skip_element_post):
+            rod_external_forces[..., i] += (force_on_one_element[i] * tangents[..., i]) * 0.5
+            rod_external_forces[..., i+1] += (force_on_one_element[i] * tangents[..., i]) * 0.5
+            rod_external_torques[2, i] += torque_on_one_element[i]
+
+        rod_external_forces[..., 0] += 0.5 * force_on_one_element[0] * tangents[..., 0]
+        rod_external_forces[..., -1] += 0.5 * force_on_one_element[-1] * tangents[..., -1]
+
+    def apply_torques(self, system: "FreeCosseratRod", time):
+        # Force and torque included together
+        pass

@@ -53,7 +53,7 @@ def nb_dampen_rates(v, w, k, e):
         v[:, i] = v[:, i] * k
 
     for i in range(n_node - 1):
-        w[:, i] = w[:, i] * k * e[i]
+        w[:, i] = w[:, i] * k ** e[i]
 
 
 class LaplaceDissipationFilterV2(DamperBase):

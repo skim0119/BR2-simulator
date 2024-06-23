@@ -146,8 +146,8 @@ def visual_twist_with_surface(
                         rod_lines[rod_idx].set_ydata(inst_position[0])
 
                         com = com_history_unpacker(rod_idx, time_idx)
-                        rod_com_lines[rod_idx].set_xdata(com[2])
-                        rod_com_lines[rod_idx].set_ydata(com[0])
+                        rod_com_lines[rod_idx].set_xdata([com[2]])
+                        rod_com_lines[rod_idx].set_ydata([com[0]])
 
                         rod_scatters[rod_idx].set_offsets(
                             np.vstack((inst_position[2], inst_position[0])).T

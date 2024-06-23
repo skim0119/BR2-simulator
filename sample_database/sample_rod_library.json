@@ -16,17 +16,21 @@
     "Rods": {
         "RodBend": {
             "Info"  : "Simple bend rod for test",
+            "alpha" : 80,
+            "beta" : -80,
             "gamma" : [0],
             "hollow" : true
         },
         "RodRightTwist": {
             "Info"  : "Simple right-hand twist rod for test",
-            "alpha" : [60],
+            "alpha" : 60,
+            "beta" : 0,
             "hollow" : true
         },
         "RodLeftTwist": {
             "Info" : "Simple left-hand twist rod for test",
-            "beta" : [-60],
+            "alpha" : 0,
+            "beta" : -60,
             "hollow" : true
         }
     }
