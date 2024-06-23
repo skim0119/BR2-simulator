@@ -1,0 +1,19 @@
+{ 
+    "CaseID": 1,
+    "Date": "2024-06-29",
+    "Info": "Single-bend FREE actuation test using fiber-reinforced constraint",
+    "Segments": {
+        "seg1": {
+            "rod_order": ["RodElongation"],
+            "base_position": [
+                [0.0, 0.0]
+            ],
+            "y-rotation":[0.0]
+        }
+    },
+    "Activations": {
+        "action1": [
+            ["seg1", 0]
+        ]
+    }
+}
