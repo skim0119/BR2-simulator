@@ -93,19 +93,17 @@ class MemoryBlockConnections(Connections):
                     my_block_idx = 0
                     for block_idx, memory_block in enumerate(self.systems()):
                         if (
-                            np.where(
-                                first_sys_idx
-                                == memory_block.system_idx_list
-                            )[0].size
+                            np.where(first_sys_idx == memory_block.system_idx_list)[
+                                0
+                            ].size
                             == 1
                         ):
                             my_block_idx += block_idx
 
                         if (
-                            np.where(
-                                second_sys_idx
-                                == memory_block.system_idx_list
-                            )[0].size
+                            np.where(second_sys_idx == memory_block.system_idx_list)[
+                                0
+                            ].size
                             == 1
                         ):
                             my_block_idx += block_idx
@@ -169,7 +167,9 @@ class MemoryBlockConnections(Connections):
                 )
 
                 # Create and append MemoryBlockConnection class. This is a wrapper we use.
-                _memory_block_connect = _MemoryBlockConnect(first_block_sys_idx, second_block_sys_idx)
+                _memory_block_connect = _MemoryBlockConnect(
+                    first_block_sys_idx, second_block_sys_idx
+                )
                 _memory_block_connector.append(_memory_block_connect)
                 self._feature_group_synchronize.append_id(_memory_block_connect)
                 # Update the connection type.
@@ -274,7 +274,13 @@ class MemoryBlockConnections(Connections):
             )
 
         for p, connection in zip(self._connections_list, self._connections):
-            first_sys_idx, second_sys_idx, first_sys_connection_idx, second_sys_connection_idx, connection_instance = p
+            (
+                first_sys_idx,
+                second_sys_idx,
+                first_sys_connection_idx,
+                second_sys_connection_idx,
+                connection_instance,
+            ) = p
             func = functools.partial(
                 apply_forces_and_torques,
                 connect_instance=connection_instance,
@@ -284,7 +290,6 @@ class MemoryBlockConnections(Connections):
                 second_connect_idx=second_sys_connection_idx,
             )
             self._feature_group_synchronize.add_operators(connection, [func])
-
 
 
 class _MemoryBlockConnect:

@@ -18,7 +18,8 @@ from elastica._calculus import _clip_array
 from elastica._linalg import _batch_cross, _batch_dot, _batch_norm, _batch_matvec
 from elastica._linalg import _batch_product_i_k_to_ik
 from elastica.restart import save_state, load_state
-#from elastica.experimental.connection_contact_joint.parallel_connection import (
+
+# from elastica.experimental.connection_contact_joint.parallel_connection import (
 from br2.rod.cosserat_rod import FreeCosseratRod
 from br2.surface_connection import (
     SurfaceJointSideBySide,
@@ -41,11 +42,11 @@ from br2.modules.block_connections import MemoryBlockConnections
 class BR2Simulator(
     CustomBaseSystemCollection,
     Constraints,
-    #Connections,
+    # Connections,
     MemoryBlockConnections,
     Forcing,
     Damping,
-    CallBacks
+    CallBacks,
 ):
     pass
 
@@ -83,7 +84,9 @@ class FreeCallback(CallBackBaseClass):
         self.callback_params["lengths"].append(system.lengths.copy())
         self.callback_params["dilatation"].append(system.dilatation.copy())
         self.callback_params["radius"].append(system.radius.copy())
-        self.callback_params["com"].append(system.compute_position_center_of_mass().copy())
+        self.callback_params["com"].append(
+            system.compute_position_center_of_mass().copy()
+        )
         # self.callback_params["vcom"].append(system.compute_velocity_center_of_mass())
 
         self.callback_params["volume"].append(system.volume.copy())
@@ -102,14 +105,16 @@ class FreeAssembly:
 
         # Parameter
         self.toggle_gravity = gravity
-        
+
         # Scale by modulus
         self.k_multiplier = kwargs.get("k_multiplier", 0.166) * 1e6
         self.nu_multiplier = kwargs.get("nu_multiplier", 0)  # Scale from 0 to 1
         self.kt_multiplier = kwargs.get("kt_multiplier", 1)
         self.k_repulsive_multiplier = kwargs.get("k_repulsive", 2) * 1e6
         # DEBUG
-        print(f"  {self.k_multiplier=} {self.nu_multiplier=} {self.kt_multiplier=} {self.k_repulsive_multiplier=}")
+        print(
+            f"  {self.k_multiplier=} {self.nu_multiplier=} {self.kt_multiplier=} {self.k_repulsive_multiplier=}"
+        )
 
     def save_state(self, **kwargs):
         # kwargs: directory, time, verbose
@@ -266,7 +271,14 @@ class FreeAssembly:
     def generate_callbacks(self, step_skip, time_interval=None, callback_class=None):
         data_rods = []
         for rod_name in self.free.keys():
-            data_rods.append(self.add_callback(rod_name, step_skip, time_interval=time_interval, callback=callback_class))
+            data_rods.append(
+                self.add_callback(
+                    rod_name,
+                    step_skip,
+                    time_interval=time_interval,
+                    callback=callback_class,
+                )
+            )
         return data_rods
 
     def set_actuation(self, actuation: dict):
@@ -297,12 +309,12 @@ class FreeAssembly:
         if getattr(rod_spec, "hollow", False):
             outer_radius = rod.outer_radius
             inner_radius = rod.inner_radius
-            hollow_scale_bend = (
-                (2 * outer_radius) ** 4 - (2 * inner_radius) ** 4
-            ) / ((2 * outer_radius) ** 4)
-            hollow_scale_shear = (
-                (2 * outer_radius) ** 2 - (2 * inner_radius) ** 2
-            ) / ((2 * outer_radius) ** 2)
+            hollow_scale_bend = ((2 * outer_radius) ** 4 - (2 * inner_radius) ** 4) / (
+                (2 * outer_radius) ** 4
+            )
+            hollow_scale_shear = ((2 * outer_radius) ** 2 - (2 * inner_radius) ** 2) / (
+                (2 * outer_radius) ** 2
+            )
             rod.bend_matrix = hollow_scale_bend * rod.bend_matrix
             rod.shear_matrix = hollow_scale_shear * rod.shear_matrix
 
@@ -345,7 +357,7 @@ class FreeAssembly:
             angle = alpha * np.pi / 180
             scale = (
                 np.pi
-                * (rod.inner_radius ** 3)
+                * (rod.inner_radius**3)
                 * ((np.sin(angle) ** 2) + 2 * (np.cos(angle) ** 2))
                 / (np.sin(2 * angle))
             )
@@ -354,7 +366,7 @@ class FreeAssembly:
             )
 
     def add_straight_fibers(self, rod, actuation_ref, fiber_angles: list):
-        scale = np.pi * rod.radius[-1] * (rod.inner_radius ** 2)
+        scale = np.pi * rod.radius[-1] * (rod.inner_radius**2)
         for gamma in fiber_angles:
             self.simulator.add_forcing_to(rod).using(
                 FreeBendActuation,
@@ -364,8 +376,8 @@ class FreeAssembly:
             )
 
     def add_elongation_force(self, rod, actuation_ref):
-        #scale = np.pi * rod.inner_radius ** 2
-        scale = 1. #np.pi * rod.inner_radius ** 2
+        # scale = np.pi * rod.inner_radius ** 2
+        scale = 1.0  # np.pi * rod.inner_radius ** 2
         print(f"  actuation addded: elongation scale {scale}")
         self.simulator.add_forcing_to(rod).using(
             FreeCombinedActuation,
@@ -373,7 +385,15 @@ class FreeAssembly:
             scale=scale,
         )
 
-    def add_free(self, name, actuation_name, alpha:float, beta:float, gamma:list[float], **rod_spec):
+    def add_free(
+        self,
+        name,
+        actuation_name,
+        alpha: float,
+        beta: float,
+        gamma: list[float],
+        **rod_spec,
+    ):
         # Create rod
         rod = self.create_rod(name, **rod_spec)
         actuation_ref = self.get_actuation_reference(actuation_name)
@@ -390,9 +410,9 @@ class FreeAssembly:
                 self.add_straight_fibers(rod, actuation_ref, gamma)
 
             # TODO: Remove below later
-            #if len(alpha) == 0 and len(beta) == 0 and len(gamma) == 0:
+            # if len(alpha) == 0 and len(beta) == 0 and len(gamma) == 0:
             #    self.add_elongation_force(rod, actuation_ref)
-            #else:
+            # else:
             #    self.add_angled_fibers(rod, actuation_ref, alpha)
             #    self.add_angled_fibers(rod, actuation_ref, beta)
             #    self.add_straight_fibers(rod, actuation_ref, gamma)
@@ -436,9 +456,11 @@ class FreeAssembly:
 
         for i in range(n_elems):
             k_conn = (
-                rod_one.radius[i] * rod_two.radius[i]
+                rod_one.radius[i]
+                * rod_two.radius[i]
                 / (rod_one.radius[i] + rod_two.radius[i])
-                * rod_one.lengths[i] / (rod_one.radius[i] + rod_two.radius[i])
+                * rod_one.lengths[i]
+                / (rod_one.radius[i] + rod_two.radius[i])
             )
 
             self.simulator.connect(
@@ -448,9 +470,9 @@ class FreeAssembly:
                 second_connect_idx=i,
             ).using(
                 SurfaceJointSideBySide,
-                k=k_conn*self.k_multiplier,
+                k=k_conn * self.k_multiplier,
                 nu=self.nu_multiplier,
-                k_repulsive=k_conn*self.k_repulsive_multiplier,
+                k_repulsive=k_conn * self.k_repulsive_multiplier,
                 rod_one_direction_vec_in_material_frame=rod_one_direction_vec_in_material_frame[
                     ..., i
                 ],
@@ -468,19 +490,25 @@ class FreeAssembly:
         ) = get_connection_vector_straight_straight_rod(
             rod_one=rod_one,
             rod_two=rod_two,
-            rod_one_idx=(rod_one.n_elems-1, rod_one.n_elems),
+            rod_one_idx=(rod_one.n_elems - 1, rod_one.n_elems),
             rod_two_idx=(0, 1),
         )
-        rod_one_direction_vec_in_material_frame = rod_one_direction_vec_in_material_frame[..., 0]
-        rod_two_direction_vec_in_material_frame = rod_two_direction_vec_in_material_frame[..., 0]
+        rod_one_direction_vec_in_material_frame = (
+            rod_one_direction_vec_in_material_frame[..., 0]
+        )
+        rod_two_direction_vec_in_material_frame = (
+            rod_two_direction_vec_in_material_frame[..., 0]
+        )
         offset_btw_rods = offset_btw_rods[0]
         rod_one_idx = rod_one.n_elems - 1
         rod_two_idx = 0
 
         k_conn = (
-            rod_one.radius[rod_one_idx] * rod_two.radius[rod_two_idx]
+            rod_one.radius[rod_one_idx]
+            * rod_two.radius[rod_two_idx]
             / (rod_one.radius[rod_one_idx] + rod_two.radius[rod_two_idx])
-            * rod_one.lengths[rod_one_idx] / (rod_one.radius[rod_one_idx] + rod_two.radius[rod_two_idx])
+            * rod_one.lengths[rod_one_idx]
+            / (rod_one.radius[rod_one_idx] + rod_two.radius[rod_two_idx])
         )
 
         self.simulator.connect(
@@ -490,9 +518,9 @@ class FreeAssembly:
             second_connect_idx=rod_two_idx,
         ).using(
             SurfaceJointSideBySide,
-            k=k_conn*self.k_multiplier,
+            k=k_conn * self.k_multiplier,
             nu=self.nu_multiplier,
-            k_repulsive=0.,
+            k_repulsive=0.0,
             rod_one_direction_vec_in_material_frame=rod_one_direction_vec_in_material_frame,
             rod_two_direction_vec_in_material_frame=rod_two_direction_vec_in_material_frame,
             offset_btw_rods=offset_btw_rods,

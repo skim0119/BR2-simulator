@@ -28,10 +28,8 @@ class BaseSystemCollection(ea.BaseSystemCollection):
         self._finalize_flag = True
 
         # construct memory block
-        self.__final_systems = construct_memory_block_structures(self._systems)
-        # TODO: try to remove the _systems list for memory optimization
-        # self._systems.clear()
-        # del self._systems
+        self.__final_blocks = construct_memory_block_structures(self.systems())
+        self.__systems.extend(self.__final_blocks)
 
         # Recurrent call finalize functions for all components.
         for finalize in self._feature_group_finalize:

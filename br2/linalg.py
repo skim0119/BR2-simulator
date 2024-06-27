@@ -56,4 +56,3 @@ def _single_inv_rotate(director):
         vector *= multiplier
 
     return vector
-

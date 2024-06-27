@@ -13,13 +13,13 @@ import numpy as np
 
 from elastica import *
 from elastica._calculus import _isnan_check
-from elastica.timestepper import extend_stepper_interface
 
 from br2.visualize.post_processing import plot_video_with_surface
 from br2.visualize.twist_angle import visual_twist_with_surface
 
 from br2.free_simulator import FreeAssembly
 from br2.custom_callback import BlenderRodCallback
+
 
 @dataclass
 class DataPaths:
@@ -165,9 +165,7 @@ class Environment:
         self.time_step = time_step
 
         # Recording speed
-        self.step_skip = int(
-            1.0 / (rendering_fps * self.time_step)
-        )
+        self.step_skip = max(1, int(1.0 / (rendering_fps * self.time_step)))
         self.rendering_fps = rendering_fps
         self.capture_interval = capture_interval
         self.export_blender = export_blender
@@ -222,17 +220,14 @@ class Environment:
         )  # [seg,rod]
         if self.export_blender:
             self.assy.generate_callbacks(
-                self.step_skip, time_interval=self.capture_interval, callback_class=BlenderRodCallback
+                self.step_skip,
+                time_interval=self.capture_interval,
+                callback_class=BlenderRodCallback,
             )  # [seg,rod]
 
         # Finalize simulation environment. After finalize, you cannot add
         # any forcing, constrain or call back functions
         self.simulator.finalize()
-
-        # do_step, stages_and_updates will be used in step function
-        self.do_step, self.stages_and_updates = extend_stepper_interface(
-            self.StatefulStepper, self.simulator
-        )
         self.time = start_time  # simulation time
 
     def run(
@@ -288,9 +283,7 @@ class Environment:
             bar_format="{desc}: {percentage:.3f}%|{bar}| {n:.5f}/{total_fmt} [{elapsed}<{remaining}",
         ) as pbar:
             while time < self.time + duration:
-                time = self.do_step(
-                    self.StatefulStepper,
-                    self.stages_and_updates,
+                time = self.StatefulStepper.step(
                     self.simulator,
                     time,
                     self.time_step,
@@ -405,8 +398,8 @@ class Environment:
 
     def render_video(
         self,
-        visualize_twist_angle: bool=False,
-        max_fps: bool=None,
+        visualize_twist_angle: bool = False,
+        max_fps: bool = None,
         **kwargs,
     ) -> None:
         """
@@ -482,13 +475,16 @@ class Environment:
 
     def debug_data(self):
         import pandas as pd
+
         save_folder = self.paths.renderings
 
-        def find_max_val(data):
+        def find_max_val(data, find_min=False):
             if data.ndim == 3:
                 data = np.linalg.norm(data, axis=1)
             isnan = np.isnan(data).any(axis=1)
             max_val = np.nanmax(data, axis=1)
+            if find_min:
+                max_val = np.nanmin(data, axis=1)
             median_val = np.nanmedian(data, axis=1)
 
             return max_val, median_val, isnan
@@ -498,60 +494,88 @@ class Environment:
             step = np.array(data_rod["step"])
             pos, pos_median, pos_isnan = find_max_val(np.array(data_rod["position"]))
             vel, vel_median, vel_isnan = find_max_val(np.array(data_rod["velocity"]))
-            acc, acc_median, acc_isnan = find_max_val(np.array(data_rod["acceleration"]))
+            acc, acc_median, acc_isnan = find_max_val(
+                np.array(data_rod["acceleration"])
+            )
             omega, omega_median, omega_isnan = find_max_val(np.array(data_rod["omega"]))
             alpha, alpha_median, alpha_isnan = find_max_val(np.array(data_rod["alpha"]))
-            ext_force, ext_force_median, ext_force_isnan = find_max_val(np.array(data_rod["external_forces"]))
-            int_force, int_force_median, int_force_isnan = find_max_val(np.array(data_rod["internal_forces"]))
-            ext_torque, ext_torque_median, ext_torque_isnan = find_max_val(np.array(data_rod["external_torques"]))
-            int_torque, int_torque_median, int_torque_isnan = find_max_val(np.array(data_rod["internal_torques"]))
-            dilatation, dilatation_median, dilatation_isnan = find_max_val(np.array(data_rod["dilatation"]))
-            radius, radius_median, radius_isnan = find_max_val(np.array(data_rod["radius"]))
+            ext_force, ext_force_median, ext_force_isnan = find_max_val(
+                np.array(data_rod["external_forces"])
+            )
+            int_force, int_force_median, int_force_isnan = find_max_val(
+                np.array(data_rod["internal_forces"])
+            )
+            ext_torque, ext_torque_median, ext_torque_isnan = find_max_val(
+                np.array(data_rod["external_torques"])
+            )
+            int_torque, int_torque_median, int_torque_isnan = find_max_val(
+                np.array(data_rod["internal_torques"])
+            )
+            dilatation, dilatation_median, dilatation_isnan = find_max_val(
+                np.array(data_rod["dilatation"])
+            )
+            radius, radius_median, radius_isnan = find_max_val(
+                np.array(data_rod["radius"]), find_min=True
+            )
             kappa, kappa_median, kappa_isnan = find_max_val(np.array(data_rod["kappa"]))
             sigma, sigma_median, sigma_isnan = find_max_val(np.array(data_rod["sigma"]))
-            df = pd.DataFrame({
-                "time": time,
-                "step": step,
-                "pos": pos,
-                "pos_median": pos_median,
-                "pos_isnan": pos_isnan,
-                "vel": vel,
-                "vel_median": vel_median,
-                "vel_isnan": vel_isnan,
-                "acc": acc,
-                "acc_median": acc_median,
-                "acc_isnan": acc_isnan,
-                "omega": omega,
-                "omega_median": omega_median,
-                "omega_isnan": omega_isnan,
-                "alpha": alpha,
-                "alpha_median": alpha_median,
-                "alpha_isnan": alpha_isnan,
-                "ext_force": ext_force,
-                "ext_force_median": ext_force_median,
-                "ext_force_isnan": ext_force_isnan,
-                "int_force": int_force,
-                "int_force_median": int_force_median,
-                "int_force_isnan": int_force_isnan,
-                "ext_torque": ext_torque,
-                "ext_torque_median": ext_torque_median,
-                "ext_torque_isnan": ext_torque_isnan,
-                "int_torque": int_torque,
-                "int_torque_median": int_torque_median,
-                "int_torque_isnan": int_torque_isnan,
-                "dilatation": dilatation,
-                "dilatation_median": dilatation_median,
-                "dilatation_isnan": dilatation_isnan,
-                "radius": radius,
-                "radius_median": radius_median,
-                "radius_isnan": radius_isnan,
-                "kappa": kappa,
-                "kappa_median": kappa_median,
-                "kappa_isnan": kappa_isnan,
-                "sigma": sigma,
-                "sigma_median": sigma_median,
-                "sigma_isnan": sigma_isnan,
-            })
+            alpha_angle, alpha_angle_median, alpha_angle_isnan = find_max_val(np.array(data_rod["alpha_angle"]))
+            beta_angle, beta_angle_median, beta_angle_isnan = find_max_val(np.array(data_rod["beta_angle"]))
+            delta_turn, delta_turn_median, delta_turn_isnan = find_max_val(np.array(data_rod["delta_turn"]))
+            df = pd.DataFrame(
+                {
+                    "time": time,
+                    "step": step,
+                    "pos": pos,
+                    "pos_median": pos_median,
+                    "pos_isnan": pos_isnan,
+                    "vel": vel,
+                    "vel_median": vel_median,
+                    "vel_isnan": vel_isnan,
+                    "acc": acc,
+                    "acc_median": acc_median,
+                    "acc_isnan": acc_isnan,
+                    "omega": omega,
+                    "omega_median": omega_median,
+                    "omega_isnan": omega_isnan,
+                    "alpha": alpha,
+                    "alpha_median": alpha_median,
+                    "alpha_isnan": alpha_isnan,
+                    "ext_force": ext_force,
+                    "ext_force_median": ext_force_median,
+                    "ext_force_isnan": ext_force_isnan,
+                    "int_force": int_force,
+                    "int_force_median": int_force_median,
+                    "int_force_isnan": int_force_isnan,
+                    "ext_torque": ext_torque,
+                    "ext_torque_median": ext_torque_median,
+                    "ext_torque_isnan": ext_torque_isnan,
+                    "int_torque": int_torque,
+                    "int_torque_median": int_torque_median,
+                    "int_torque_isnan": int_torque_isnan,
+                    "dilatation": dilatation,
+                    "dilatation_median": dilatation_median,
+                    "dilatation_isnan": dilatation_isnan,
+                    "radius(min)": radius,
+                    "radius_median": radius_median,
+                    "radius_isnan": radius_isnan,
+                    "kappa": kappa,
+                    "kappa_median": kappa_median,
+                    "kappa_isnan": kappa_isnan,
+                    "sigma": sigma,
+                    "sigma_median": sigma_median,
+                    "sigma_isnan": sigma_isnan,
+                    "alpha_angle": alpha_angle,
+                    "alpha_angle_median": alpha_angle_median,
+                    "alpha_angle_isnan": alpha_angle_isnan,
+                    "beta_angle": beta_angle,
+                    "beta_angle_median": beta_angle_median,
+                    "beta_angle_isnan": beta_angle_isnan,
+                    "delta_turn": delta_turn,
+                    "delta_turn_median": delta_turn_median,
+                    "delta_turn_isnan": delta_turn_isnan,
+                }
+            )
             df.to_csv(os.path.join(save_folder, f"data_rod_{ridx}_debug.csv"))
 
     def close(self):
@@ -563,5 +587,5 @@ class Environment:
 
         if self.export_blender:
             import bsr
+
             bsr.save(blender_path)
-        

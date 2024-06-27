@@ -19,9 +19,7 @@ from br2.rod.cosserat_rod import (
 )
 
 
-class MemoryBlockMuscularRod(
-    FreeCosseratRod, _RodSymplecticStepperMixin
-):
+class MemoryBlockMuscularRod(FreeCosseratRod, _RodSymplecticStepperMixin):
     """
     Memory block class for Muscular Cosserat rod equations. This class is derived from Muscular Rod class in order to inherit
     the methods of Muscular rod class. This class takes the Muscular rod object (systems) and creates big

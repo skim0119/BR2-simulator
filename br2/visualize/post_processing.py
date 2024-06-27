@@ -73,6 +73,7 @@ def plot_video_with_surface(
 
     # Rod
     n_visualized_rods = len(rods_history)  # should be one for now
+
     # Rod info
     def rod_history_unpacker(rod_idx, t_idx):
         return (

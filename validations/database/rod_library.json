@@ -30,7 +30,9 @@
             "beta" : -60
         },
         "RodElongation": {
-            "Info"  : "Simple elongation rod"
+            "Info"  : "Simple elongation rod",
+            "alpha" : 80,
+            "beta" : -80
         }
     }
 }

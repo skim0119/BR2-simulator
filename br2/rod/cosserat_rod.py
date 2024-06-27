@@ -25,6 +25,7 @@ from typing import Optional
 position_difference_kernel = _difference
 position_average = _average
 
+
 def _compute_sigma_kappa_for_blockstructure(memory_block) -> None:
     """
     This function is a wrapper to call functions which computes shear stretch, strain and bending twist and strain.
@@ -51,6 +52,8 @@ def _compute_sigma_kappa_for_blockstructure(memory_block) -> None:
         memory_block.sigma,
         memory_block.alpha_angle,
         memory_block.beta_angle,
+        memory_block.initial_alpha_angle,
+        memory_block.initial_beta_angle,
         memory_block.initial_radius,
         memory_block.delta_turn,
     )
@@ -61,7 +64,6 @@ def _compute_sigma_kappa_for_blockstructure(memory_block) -> None:
         memory_block.rest_voronoi_lengths,
         memory_block.kappa,
     )
-
 
 
 class FreeCosseratRod(RodBase, KnotTheory):
@@ -216,7 +218,7 @@ class FreeCosseratRod(RodBase, KnotTheory):
 
         # We add periodic elements at the memory block construction.
         # Compute shear stretch and strains.
-        #_compute_shear_stretch_strains(
+        # _compute_shear_stretch_strains(
         #    self.position_collection,
         #    self.volume,
         #    self.lengths,
@@ -232,12 +234,12 @@ class FreeCosseratRod(RodBase, KnotTheory):
         #    self.beta_angle,
         #    self.initial_radius,
         #    self.delta_turn,
-        #)
+        # )
 
         # Compute bending twist strains
-        #_compute_bending_twist_strains(
+        # _compute_bending_twist_strains(
         #    self.director_collection, self.rest_voronoi_lengths, self.kappa
-        #)
+        # )
 
     @classmethod
     def straight_rod(
@@ -390,8 +392,8 @@ class FreeCosseratRod(RodBase, KnotTheory):
         # FREE parameters
         assert alpha_fiber_angle >= 0.0
         rod.initial_radius = rod.radius.copy()
-        rod.alpha_angle = np.deg2rad(alpha_fiber_angle * np.ones(n_elements))
-        rod.beta_angle = np.deg2rad(beta_fiber_angle * np.ones(n_elements))
+        rod.alpha_angle = np.deg2rad(alpha_fiber_angle) * np.ones(n_elements)
+        rod.beta_angle = np.deg2rad(beta_fiber_angle) * np.ones(n_elements)
         rod.initial_alpha_angle = rod.alpha_angle.copy()
         rod.initial_beta_angle = rod.beta_angle.copy()
         rod.delta_turn = np.zeros(n_elements)
@@ -435,6 +437,8 @@ class FreeCosseratRod(RodBase, KnotTheory):
             self.ghost_elems_idx,
             self.alpha_angle,
             self.beta_angle,
+            self.initial_alpha_angle,
+            self.initial_beta_angle,
             self.initial_radius,
             self.delta_turn,
         )
@@ -565,9 +569,7 @@ class FreeCosseratRod(RodBase, KnotTheory):
 
 
 @numba.njit(cache=True)
-def _compute_geometry_from_state(
-    position_collection, volume, lengths, tangents
-):
+def _compute_geometry_from_state(position_collection, volume, lengths, tangents):
     """
     Update <length, tangents, and radius> given <position and volume>.
     """
@@ -605,6 +607,8 @@ def _compute_all_dilatations(
     voronoi_dilatation,
     alpha_angle,
     beta_angle,
+    initial_alpha_angle,
+    initial_beta_angle,
     initial_radius,
     delta_turn,
 ):
@@ -622,18 +626,42 @@ def _compute_all_dilatations(
         sgn_alpha = np.sign(alpha_angle[k])
         alpha = alpha_angle[k]
         beta = beta_angle[k]
-        sqrt_alpha = np.sqrt((1+np.cos(alpha)*dilatation[k])*(1-np.cos(alpha)*dilatation[k])+1e-11)
-        sqrt_beta = np.sqrt((1+np.cos(beta)*dilatation[k])*(1-np.cos(beta)*dilatation[k])+1e-11)
-        lambda_2 = -(sgn_beta * sqrt_beta * np.cos(alpha) - sgn_alpha * sqrt_alpha * np.cos(beta)) / np.sin(alpha-beta)
-        radius[k] = lambda_2 * initial_radius[k]
-        delta_turn[k] = (rest_lengths[k]/initial_radius[k]) *  \
-                (sgn_beta*np.sin(alpha)*sqrt_beta - sgn_alpha*np.sin(beta)*sqrt_alpha) / \
-                (sgn_alpha*np.cos(beta)*sqrt_alpha - sgn_beta*np.cos(alpha)*sqrt_beta)
-        volume[k] = np.pi * lengths[k] * radius[k]**2
+        sqrt_alpha = np.sqrt(
+            (1 + np.cos(alpha) * dilatation[k]) * (1 - np.cos(alpha) * dilatation[k])
+        )
+        sqrt_beta = np.sqrt(
+            (1 + np.cos(beta) * dilatation[k]) * (1 - np.cos(beta) * dilatation[k])
+        )
+        lambda_2 = -(
+            sgn_beta * sqrt_beta * np.cos(alpha) - sgn_alpha * sqrt_alpha * np.cos(beta)
+        ) / np.sin(alpha - beta)
+        #radius[k] = lambda_2 * initial_radius[k]
+        radius[k] = initial_radius[k]
+        delta_turn[k] = (
+            (rest_lengths[k] / initial_radius[k])
+            * (
+                sgn_beta * np.sin(alpha) * sqrt_beta
+                - sgn_alpha * np.sin(beta) * sqrt_alpha
+            )
+            / (
+                sgn_alpha * np.cos(beta) * sqrt_alpha
+                - sgn_beta * np.cos(alpha) * sqrt_beta
+            )
+        )
+        volume[k] = np.pi * lengths[k] * radius[k] ** 2
 
         # G. Krishnan 2015 (22)-(24)
-        #alpha_angle[k] = np.arctan((lambda_2 / dilatation[k])*(np.tan(alpha) +  (initial_radius[k]/rest_lengths[k])*delta_turn[k]))
-        #beta_angle[k] = np.arctan((lambda_2 / dilatation[k])*(np.tan(beta) +  (initial_radius[k]/rest_lengths[k])*delta_turn[k]))
+        alpha_angle[k] = np.arctan(
+            (lambda_2 / dilatation[k])
+            * (np.tan(initial_alpha_angle[k]) + (initial_radius[k] / rest_lengths[k]) * delta_turn[k])
+        )
+        beta_angle[k] = np.arctan(
+            (lambda_2 / dilatation[k])
+            * (np.tan(initial_beta_angle[k]) + (initial_radius[k] / rest_lengths[k]) * delta_turn[k])
+        )
+        # Constant fiber length assumption
+        #alpha_angle[k] = sgn_alpha*np.arccos(dilatation[k] * np.cos(initial_alpha_angle[k]))
+        #beta_angle[k] = sgn_beta*np.arccos(dilatation[k] * np.cos(initial_beta_angle[k]))
 
     # Cmopute eq (3.4) from 2018 RSOS paper
     # Note : we can use trapezoidal kernel, but it has padding and will be slower
@@ -686,6 +714,8 @@ def _compute_shear_stretch_strains(
     sigma,
     alpha_angle,
     beta_angle,
+    initial_alpha_angle,
+    initial_beta_angle,
     initial_radius,
     delta_turn,
 ):
@@ -706,6 +736,8 @@ def _compute_shear_stretch_strains(
         voronoi_dilatation,
         alpha_angle,
         beta_angle,
+        initial_alpha_angle,
+        initial_beta_angle,
         initial_radius,
         delta_turn,
     )
@@ -732,6 +764,8 @@ def _compute_internal_shear_stretch_stresses_from_model(
     internal_stress,
     alpha_angle,
     beta_angle,
+    initial_alpha_angle,
+    initial_beta_angle,
     initial_radius,
     delta_turn,
 ):
@@ -756,6 +790,8 @@ def _compute_internal_shear_stretch_stresses_from_model(
         sigma,
         alpha_angle,
         beta_angle,
+        initial_alpha_angle,
+        initial_beta_angle,
         initial_radius,
         delta_turn,
     )
@@ -824,6 +860,8 @@ def _compute_internal_forces(
     ghost_elems_idx,
     alpha_angle,
     beta_angle,
+    initial_alpha_angle,
+    initial_beta_angle,
     initial_radius,
     delta_turn,
 ):
@@ -850,6 +888,8 @@ def _compute_internal_forces(
         internal_stress,
         alpha_angle,
         beta_angle,
+        initial_alpha_angle,
+        initial_beta_angle,
         initial_radius,
         delta_turn,
     )

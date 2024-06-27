@@ -90,10 +90,10 @@ class SurfaceJointSideBySide(FreeJoint):
 
         self.rod_one_direction_vec_in_material_frame = np.array(
             rod_one_direction_vec_in_material_frame
-        ).T
+        )
         self.rod_two_direction_vec_in_material_frame = np.array(
             rod_two_direction_vec_in_material_frame
-        ).T
+        )
 
     # Apply force is same as free joint
     def apply_forces(self, system_one, index_one, system_two, index_two):
@@ -195,20 +195,20 @@ class SurfaceJointSideBySide(FreeJoint):
         spring_force = k * (distance_vector)
 
         # Damping force
-        #rod_one_element_velocity = 0.5 * (
+        # rod_one_element_velocity = 0.5 * (
         #    rod_one_velocity_collection[:, index_one]
         #    + rod_one_velocity_collection[:, index_one + 1]
-        #)
-        #rod_two_element_velocity = 0.5 * (
+        # )
+        # rod_two_element_velocity = 0.5 * (
         #    rod_two_velocity_collection[:, index_two]
         #    + rod_two_velocity_collection[:, index_two + 1]
-        #)
-        #relative_velocity = rod_two_element_velocity - rod_one_element_velocity
-        #damping_force = nu * relative_velocity
+        # )
+        # relative_velocity = rod_two_element_velocity - rod_one_element_velocity
+        # damping_force = nu * relative_velocity
         for k in range(index_one.shape[0]):
             v1 = rod_one_velocity_collection[:, index_one[k]]
             v2 = rod_two_velocity_collection[:, index_two[k]]
-            d = nu[k]*(v1-v2)/2.
+            d = nu[k] * (v1 - v2) / 2.0
             rod_one_velocity_collection[:, index_one[k]] -= d
             rod_two_velocity_collection[:, index_two[k]] += d
 
