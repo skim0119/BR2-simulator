@@ -41,12 +41,12 @@ class MemoryBlockConnections(Connections):
         """
         sys_idx = [None] * 2
         for i_sys, sys in enumerate((first_rod, second_rod)):
-            sys_idx[i_sys] = self._get_sys_idx_if_valid(sys)
+            sys_idx[i_sys] = self.get_system_index(sys)
 
         # For each system identified, get max dofs
         # FIXME: Revert back to len, it should be able to take, systems without elements!
         # sys_dofs = [len(self._systems[idx]) for idx in sys_idx]
-        sys_dofs = [self._systems[idx].n_elems for idx in sys_idx]
+        sys_dofs = [self[idx].n_elems for idx in sys_idx]
 
         # Create _Connect object, cache it and return to user
         _connector = _Connect(*sys_idx, *sys_dofs)
@@ -66,7 +66,7 @@ class MemoryBlockConnections(Connections):
         )
         _connection_cls_idx_list = [[] for _ in _connection_cls_type_list]
         number_of_connection_cls_type = len(_connection_cls_type_list)
-        number_of_memory_block = len(list(self.systems()))
+        number_of_memory_block = len(list(self.block_systems()))
         # TODO: improve memory_block_connections for number of memory_blocks>2.
         if number_of_memory_block > 2:
             raise NotImplemented(
@@ -91,7 +91,7 @@ class MemoryBlockConnections(Connections):
                     #   my_block_idx = 0+1 = 1
                     # 3) first system and second system belongs to memory block two => my_block_idx=1+1=2
                     my_block_idx = 0
-                    for block_idx, memory_block in enumerate(self.systems()):
+                    for block_idx, memory_block in enumerate(self.block_systems()):
                         if (
                             np.where(first_sys_idx == memory_block.system_idx_list)[
                                 0
@@ -143,7 +143,7 @@ class MemoryBlockConnections(Connections):
                     if (
                         np.where(
                             first_sys_idx
-                            == self._memory_blocks[block_idx].system_idx_list
+                            == list(self.block_systems())[block_idx].system_idx_list
                         )[0].size
                         == 1
                     ):
@@ -152,18 +152,18 @@ class MemoryBlockConnections(Connections):
                     if (
                         np.where(
                             second_sys_idx
-                            == self._memory_blocks[block_idx].system_idx_list
+                            == list(self.block_systems())[block_idx].system_idx_list
                         )[0].size
                         == 1
                     ):
                         # Index on memory_blocks list
                         second_block_idx = block_idx
                 # Get the memory block index on system list.
-                first_block_sys_idx = self._get_sys_idx_if_valid(
-                    self._memory_blocks[first_block_idx]
+                first_block_sys_idx = self.get_system_index(
+                    list(self.block_systems())[first_block_idx]
                 )
-                second_block_sys_idx = self._get_sys_idx_if_valid(
-                    self._memory_blocks[second_block_idx]
+                second_block_sys_idx = self.get_system_index(
+                    list(self.block_systems())[second_block_idx]
                 )
 
                 # Create and append MemoryBlockConnection class. This is a wrapper we use.
@@ -190,20 +190,20 @@ class MemoryBlockConnections(Connections):
                     ].second_sys_connection_idx
 
                     first_sys_idx_on_block = np.where(
-                        self._memory_blocks[first_block_idx].system_idx_list
+                        list(self.block_systems())[first_block_idx].system_idx_list
                         == first_sys_idx
                     )[0]
                     second_sys_idx_on_block = np.where(
-                        self._memory_blocks[second_block_idx].system_idx_list
+                        list(self.block_systems())[second_block_idx].system_idx_list
                         == second_sys_idx
                     )[0]
 
                     # Find the node or element or voronoi offset we need, to get the corresponding
                     # index on memory block.
-                    first_sys_offset = self._memory_blocks[
+                    first_sys_offset = list(self.block_systems())[
                         first_block_idx
                     ].start_idx_in_rod_nodes[first_sys_idx_on_block][0]
-                    second_sys_offset = self._memory_blocks[
+                    second_sys_offset = list(self.block_systems())[
                         second_block_idx
                     ].start_idx_in_rod_nodes[second_sys_idx_on_block][0]
 
@@ -284,9 +284,9 @@ class MemoryBlockConnections(Connections):
             func = functools.partial(
                 apply_forces_and_torques,
                 connect_instance=connection_instance,
-                system_one=self._systems[first_sys_idx],
+                system_one=self[first_sys_idx],
                 first_connect_idx=first_sys_connection_idx,
-                system_two=self._systems[second_sys_idx],
+                system_two=self[second_sys_idx],
                 second_connect_idx=second_sys_connection_idx,
             )
             self._feature_group_synchronize.add_operators(connection, [func])

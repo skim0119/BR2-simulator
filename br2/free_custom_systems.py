@@ -110,32 +110,32 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         # Accumulated rotation
         self.rev = 0
 
-    def constrain_values(self, rod, time):
-        rod.position_collection[..., 0] = self.fixed_position
-        rod.director_collection[..., 0] = self.fixed_directors
+    def constrain_values(self, system, time):
+        system.position_collection[..., 0] = self.fixed_position
+        system.director_collection[..., 0] = self.fixed_directors
         return
         self.restrict_position(
-            rod.position_collection[..., 0],
+            system.position_collection[..., 0],
             self.fixed_position,
-            rod.velocity_collection[..., 0],
-            rod.external_forces,
+            system.velocity_collection[..., 0],
+            system.external_forces,
             self.k,
             self.nu,
         )
         self.rev = self.restrict_orientation(
             self.kt,
-            rod.director_collection[..., 0],
+            system.director_collection[..., 0],
             self.fixed_directors,
-            rod.external_torques,
+            system.external_torques,
             self.rev,
         )
 
-    def constrain_rates(self, rod, time):
-        super().constrain_rates(rod, time)
-        rod.velocity_collection[..., 0] = 0.0
-        rod.omega_collection[..., 0] = 0.0
-        rod.acceleration_collection[..., 0] = 0.0
-        rod.alpha_collection[..., 0] = 0.0
+    def constrain_rates(self, system, time):
+        super().constrain_rates(system, time)
+        system.velocity_collection[..., 0] = 0.0
+        system.omega_collection[..., 0] = 0.0
+        system.acceleration_collection[..., 0] = 0.0
+        system.alpha_collection[..., 0] = 0.0
 
     @staticmethod
     @njit(cache=True)
@@ -143,7 +143,7 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         base_position,
         fixed_position,
         base_velocity,
-        rod_external_force,
+        system_external_force,
         k,
         nu,  # damping coefficient
     ):
@@ -154,7 +154,7 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         end_distance = np.sqrt(np.dot(end_distance_vector, end_distance_vector))
 
         # Below if check is not efficient find something else
-        # We are checking if end of rod1 and start of rod2 are at the same point in space
+        # We are checking if end of system1 and start of system2 are at the same point in space
         # If they are at the same point in space, it is a zero vector.
         if end_distance <= 1e-8:
             normalized_end_distance_vector = np.array([0.0, 0.0, 0.0])
@@ -171,7 +171,7 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         damping_force = -nu * normal_relative_velocity
 
         contact_force = elastic_force + damping_force
-        rod_external_force[..., 0] += contact_force
+        system_external_force[..., 0] += contact_force
 
     @staticmethod
     @njit(cache=True)
@@ -179,7 +179,7 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         kt,  # damping coefficient
         base_directors,
         fixed_directors,
-        rod_external_torques,
+        system_external_torques,
         rev,
     ):
         return 0
@@ -195,13 +195,13 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         else:
             normalized_omega = omega / theta
         new_theta = theta + 2 * np.pi * rev
-        torque_on_rod = normalized_omega * kt * theta  # new_theta
+        torque_on_system = normalized_omega * kt * theta  # new_theta
 
         # Change coordinate
-        torque_on_rod_material_frame = base_directors @ torque_on_rod
+        torque_on_system_material_frame = base_directors @ torque_on_system
 
         # Add torque
-        rod_external_torques[..., 0] += torque_on_rod_material_frame
+        system_external_torques[..., 0] += torque_on_system_material_frame
 
         # return 0  # np.fix(new_theta / (2*np.pi))
 
@@ -225,7 +225,7 @@ class FreeCombinedActuation(NoForces):
         self.scale = scale
         self.ramp_up_time = ramp_up_time
 
-        self.direction = np.array([0.0, 0.0, 1.0])  # Rod always in tangent
+        self.direction = np.array([0.0, 0.0, 1.0])  # system always in tangent
 
     def apply_forces(self, system: "FreeCosseratRod", time):
         factor = min(1.0, time / self.ramp_up_time)

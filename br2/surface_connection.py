@@ -90,10 +90,10 @@ class SurfaceJointSideBySide(FreeJoint):
 
         self.rod_one_direction_vec_in_material_frame = np.array(
             rod_one_direction_vec_in_material_frame
-        )
+        ).T
         self.rod_two_direction_vec_in_material_frame = np.array(
             rod_two_direction_vec_in_material_frame
-        )
+        ).T
 
     # Apply force is same as free joint
     def apply_forces(self, system_one, index_one, system_two, index_two):
