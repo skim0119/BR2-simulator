@@ -13,7 +13,6 @@ def load_data(csv_path: str, x_key: str, y_key: str, keys: list[str] | None = No
 
     if keys is not None:
         info = {}
-        breakpoint()
         for key in keys:
             info[key] = np.array(data[key])
         return activation, result, info
