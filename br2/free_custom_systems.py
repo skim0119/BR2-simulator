@@ -1,9 +1,9 @@
 from elastica import *
+from elastica import NoForces
 
 from elastica.utils import Tolerance
 
-from elastica._calculus import _clip_array
-from elastica._linalg import _batch_cross, _batch_dot, _batch_norm, _batch_matvec
+from elastica._linalg import _batch_cross, _batch_dot
 from elastica._linalg import _batch_product_i_k_to_ik
 from elastica.boundary_conditions import ConstraintBase
 
@@ -18,44 +18,92 @@ from numba import njit
 
 # Defining Variable Bending
 class FreeBendActuation(NoForces):
-    # TODO
 
-    def __init__(self, actuation_ref, z_angle, scale, ramp_up_time=0.2):
+    def __init__(self, actuation_ref, z_angle, scale, ramp_up_time=0.5):
         super(FreeBendActuation, self).__init__()
         self.actuation_ref = actuation_ref
         self.z_angle = z_angle
-        self.magnitude_scale = scale  # TODO
-        """
-        Currently we are using scale to externally compute the moment scale.
-        We are assuming the radius is not changing as it deform.
-        If we want to incorporate the change in radius, we cannot use default
-        CR radius, since the basic CR is implemented assuming solid cylinder
-        """
+        self.scale = scale
         self.ramp_up_time = ramp_up_time
 
-    def apply_torques(self, system, time: float = 0.0):
+    def apply_torques(self, system, time=0.0):
         factor = min(1.0, time / self.ramp_up_time)
-        torque_mag = self.actuation_ref[0] * self.magnitude_scale * factor
         local_unit_vector = np.array([np.cos(self.z_angle), np.sin(self.z_angle), 0.0])
-        torque = torque_mag * local_unit_vector
-        # system.external_torques[..., -1] += torque
-        # """ Not used: (uniformly distributed torque) """
-        # return
-        n_elems = system.n_elems
-        torque_on_one_element = (
-            _batch_product_i_k_to_ik(torque, np.ones((n_elems))) / n_elems
-        )
-        # system.external_torques += _batch_matvec(
-        #    system.director_collection, torque_on_one_element
+        pressure = self.actuation_ref[0] * self.scale * factor
+        # torque = pressure * local_unit_vector / system.n_elems
+        # torque_on_each_element = (
+        #    _batch_product_i_k_to_ik(torque, np.ones((system.n_elems)))
         # )
-        system.external_torques += torque_on_one_element
+        # system.external_torques += torque_on_each_element
+        # return
+
+        self.nb_apply_moment(
+            local_unit_vector,
+            rod_external_torques=system.external_torques,
+            pressure=pressure,
+            radius=system.radius,
+            alpha_angle=system.alpha_angle,
+            beta_angle=system.beta_angle,
+            # alpha_angle=system.initial_alpha_angle,
+            # beta_angle=system.initial_beta_angle,
+            tangents=system.tangents,
+            n_elems=system.n_elems,
+            skip_element_pre=2,
+            skip_element_post=2,
+        )
+
+    @staticmethod
+    @njit(cache=True)
+    def nb_apply_moment(
+        moment_arm,
+        rod_external_torques,
+        pressure,
+        radius,
+        alpha_angle,
+        beta_angle,
+        tangents,
+        n_elems,
+        skip_element_pre,
+        skip_element_post,
+    ):
+        Sa = np.sin(alpha_angle)
+        Sb = np.sin(beta_angle)
+        Ca = np.cos(alpha_angle)
+        Cb = np.cos(beta_angle)
+        Sa_b = np.sin(alpha_angle - beta_angle)
+        pSaSb = Sa * Sb + 2 * Ca * Cb  # Pitch * sin(a) * sin(b)
+
+        # Compute axial force per elements
+        F_scale = (pSaSb * Sa * Sb * Sa_b**2) / (
+            (Sa * Sb * Sa_b) ** 2 + (Sa**2 - Sb**2) ** 2
+        )
+        force_on_one_element = pressure * np.pi * radius**2 * F_scale / n_elems
+
+        # Compute moment
+        _some_scale_linear_actuation_to_moment = 1.0
+
+        # print(f"alpha: {np.rad2deg(alpha_angle.min())}-{np.rad2deg(alpha_angle.max())}, beta: {np.rad2deg(beta_angle.min())}-{np.rad2deg(beta_angle.max())}")
+
+        for i in range(skip_element_pre, n_elems - skip_element_post):
+            rod_external_torques[0, i] += (
+                force_on_one_element[i]
+                * moment_arm[0]
+                * _some_scale_linear_actuation_to_moment
+            )
+            rod_external_torques[1, i] += (
+                force_on_one_element[i]
+                * moment_arm[1]
+                * _some_scale_linear_actuation_to_moment
+            )
+            # rod_external_torques[2, i] += force_on_one_element[i] * moment_arm[2] * _some_scale_linear_actuation_to_moment
 
 
 # Defining Variable Torque
+# TODO: Deprecated
 class FreeTwistActuation(NoForces):
     # TODO
 
-    def __init__(self, actuation_ref, scale, ramp_up_time=0.2):
+    def __init__(self, actuation_ref, scale, ramp_up_time=0.5):
         """
 
         Parameters
@@ -211,7 +259,7 @@ class FreeCombinedActuation(NoForces):
     Based on B. Joshua 2013
     """
 
-    def __init__(self, actuation_ref, scale, ramp_up_time=0.2):
+    def __init__(self, actuation_ref, scale, ramp_up_time=0.5):
         """
 
         Parameters
@@ -236,8 +284,8 @@ class FreeCombinedActuation(NoForces):
             radius=system.radius,
             alpha_angle=system.alpha_angle,
             beta_angle=system.beta_angle,
-            #alpha_angle=system.initial_alpha_angle,
-            #beta_angle=system.initial_beta_angle,
+            # alpha_angle=system.initial_alpha_angle,
+            # beta_angle=system.initial_beta_angle,
             tangents=system.tangents,
             n_elems=system.n_elems,
             skip_element_pre=2,

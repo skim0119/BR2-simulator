@@ -112,9 +112,9 @@ class FreeAssembly:
         self.kt_multiplier = kwargs.get("kt_multiplier", 1)
         self.k_repulsive_multiplier = kwargs.get("k_repulsive", 2) * 1e6
         # DEBUG
-        print(
-            f"  {self.k_multiplier=} {self.nu_multiplier=} {self.kt_multiplier=} {self.k_repulsive_multiplier=}"
-        )
+        # print(
+        #     f"  {self.k_multiplier=} {self.nu_multiplier=} {self.kt_multiplier=} {self.k_repulsive_multiplier=}"
+        # )
 
     def save_state(self, **kwargs):
         # kwargs: directory, time, verbose
@@ -131,10 +131,10 @@ class FreeAssembly:
         """
 
         """import rods"""
-        with open(rod_info) as json_data_file:
-            rod_info = json.load(json_data_file)
-        rod_specs = rod_info["Rods"]
-        default_rod_spec = rod_info["DefaultParams"]
+        with open(rod_info, 'r') as json_data_file:
+            rod_config = json.load(json_data_file)
+        rod_specs = rod_config["Rods"]
+        default_rod_spec = rod_config["DefaultParams"]
         for k in rod_specs.keys():  # Update default parameter if doesn't existe
             rod_spec = rod_specs[k]
             rod_spec.update(
@@ -183,11 +183,9 @@ class FreeAssembly:
 
                 # Set fiber angles
                 if "gamma" in rod_spec:
-                    rod_spec["gamma"] = [
-                        angle + y_rotation for angle in rod_spec["gamma"]
-                    ]
+                    rod_spec["gamma"] = rod_spec["gamma"] + y_rotation
                 else:
-                    rod_spec["gamma"] = []
+                    rod_spec["gamma"] = None
                 if "alpha" in rod_spec:
                     rod_spec["alpha_fiber_angle"] = rod_spec["alpha"]
                 if "beta" in rod_spec:
@@ -202,7 +200,7 @@ class FreeAssembly:
                     if actuation_name is not None:
                         break
 
-                rod = self.add_free(rod_name, actuation_name, **rod_spec)
+                rod = self.add_free(rod_name, actuation_name, verbose=verbose, **rod_spec)
 
                 self.free[rod_name] = rod
                 seg_rods.append(rod_name)
@@ -216,13 +214,15 @@ class FreeAssembly:
 
             """Parallel Connection"""
             if len(seg_rods) > 1:
-                print("connecting in parallel...")
+                if verbose:
+                    print("connecting in parallel...")
                 for rod_i in range(len(seg_rods)):
                     first_rod_name = seg_rods[rod_i - 1]
                     second_rod_name = seg_rods[rod_i]
-                    print(
-                        f"    connecting seg {seg_idx}: {first_rod_name} || {second_rod_name}"
-                    )
+                    if verbose:
+                        print(
+                            f"    connecting seg {seg_idx}: {first_rod_name} || {second_rod_name}"
+                        )
                     self.add_parallel_connection(
                         first_rod_name,
                         second_rod_name,
@@ -230,10 +230,11 @@ class FreeAssembly:
 
             if seg_idx > 0:
                 """Serial Connection"""
-                print("connecting in serial...")
-                print("  connecting seg-%d and seg-%d" % (seg_idx, seg_idx + 1))
-                print(f"  previous segment rods: {prev_seg_rods}")
-                print(f"  current segment rods: {seg_rods}")
+                if verbose:
+                    print("connecting in serial...")
+                    print("  connecting seg-%d and seg-%d" % (seg_idx, seg_idx + 1))
+                    print(f"  previous segment rods: {prev_seg_rods}")
+                    print(f"  current segment rods: {seg_rods}")
                 self.add_serial_connection(
                     prev_seg_rods,
                     seg_rods,
@@ -365,23 +366,12 @@ class FreeAssembly:
                 FreeTwistActuation, actuation_ref, scale=scale
             )
 
-    def add_straight_fibers(self, rod, actuation_ref, fiber_angles: list):
-        scale = np.pi * rod.radius[-1] * (rod.inner_radius**2)
-        for gamma in fiber_angles:
-            self.simulator.add_forcing_to(rod).using(
-                FreeBendActuation,
-                actuation_ref,
-                z_angle=gamma * np.pi / 180.0,
-                scale=scale,
-            )
-
-    def add_elongation_force(self, rod, actuation_ref):
-        # scale = np.pi * rod.inner_radius ** 2
-        scale = 1.0  # np.pi * rod.inner_radius ** 2
-        print(f"  actuation addded: elongation scale {scale}")
+    def add_straight_fibers(self, rod, actuation_ref, gamma: float, scale: float):
+        #scale = np.pi * rod.radius[-1] * (rod.inner_radius**2)
         self.simulator.add_forcing_to(rod).using(
-            FreeCombinedActuation,
+            FreeBendActuation,
             actuation_ref,
+            z_angle=gamma * np.pi / 180.0,
             scale=scale,
         )
 
@@ -391,27 +381,29 @@ class FreeAssembly:
         actuation_name,
         alpha: float,
         beta: float,
-        gamma: list[float],
+        gamma: float | None = None,
+        verbose: bool = True,
         **rod_spec,
     ):
         # Create rod
-        rod = self.create_rod(name, **rod_spec)
+        rod = self.create_rod(name, verbose=verbose, **rod_spec)
         actuation_ref = self.get_actuation_reference(actuation_name)
 
         # Add fiber
         if actuation_ref is not None:
-            scale = 1.0  # TODO: maybe remove later
-            self.simulator.add_forcing_to(rod).using(
-                FreeCombinedActuation,
-                actuation_ref,
-                scale=scale,
-            )
-            if len(gamma) > 0:
-                self.add_straight_fibers(rod, actuation_ref, gamma)
-
+            if gamma is not None:
+                scale = rod_spec["moment_scale"]
+                self.add_straight_fibers(rod, actuation_ref, gamma, scale=scale)
+            else:
+                scale = 1.0  # TODO: maybe remove later
+                self.simulator.add_forcing_to(rod).using(
+                    FreeCombinedActuation,
+                    actuation_ref,
+                    scale=scale,
+                )
             # TODO: Remove below later
             # if len(alpha) == 0 and len(beta) == 0 and len(gamma) == 0:
-            #    self.add_elongation_force(rod, actuation_ref)
+            #    ...
             # else:
             #    self.add_angled_fibers(rod, actuation_ref, alpha)
             #    self.add_angled_fibers(rod, actuation_ref, beta)

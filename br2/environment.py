@@ -190,6 +190,7 @@ class Environment:
         rod_database_path: str,
         assembly_config_path: str,
         start_time: float = 0.0,
+        verbose: bool = True,
         **kwargs,
     ) -> None:
         """
@@ -210,7 +211,7 @@ class Environment:
         self.assy = FreeAssembly(self, **kwargs)
 
         """rod name -> [seg,rod]"""
-        self.shearable_rods = self.assy.build(rod_database_path, assembly_config_path)
+        self.shearable_rods = self.assy.build(rod_database_path, assembly_config_path, verbose=verbose)
         self.simulator = self.assy.simulator
 
         # Collect data using callback function for postprocessing

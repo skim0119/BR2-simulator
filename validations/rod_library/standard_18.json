@@ -21,7 +21,7 @@
             "alpha" : 85,
             "beta" : -85,
             "gamma" : 0,
-            "moment_scale": 3.0e-2
+            "moment_scale": 1.703e-2
         },
         "RodRightTwist": {
             "Info"  : "Simple right-hand twist rod for test",

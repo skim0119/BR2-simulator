@@ -5,7 +5,8 @@ import numpy as np
 from elastica import CallBackBaseClass
 from elastica.typing import RodType
 
-from bsr import Rod, BezierSplinePipe
+from bsr import BezierSplinePipe
+from bsr import RodWithCylinder as Rod
 
 
 class BlenderRodCallback(CallBackBaseClass):
@@ -14,12 +15,13 @@ class BlenderRodCallback(CallBackBaseClass):
     """
 
     def __init__(
-        self, step_skip: int, time_interval: int, callback_params=None, **kwargs
+            self, step_skip: int, time_interval: int, callback_params=None, scale: float=100.0, **kwargs
     ) -> None:
         CallBackBaseClass.__init__(self, **kwargs)
         self.every = step_skip
         self.time_interval = time_interval
         self.key_frame = 0
+        self.scale = scale
         self.stop = False
 
         self.bsr_rod: Rod
@@ -63,7 +65,7 @@ class BlenderRodCallback(CallBackBaseClass):
         tangent,
         fiber_angle,
         helix_radius_ratio=1.0 / 20,
-        num_spline_resolution=16,
+        num_spline_resolution=32,
     ):
         radii = np.repeat(initial_radius * helix_radius_ratio, num_spline_resolution)
 
@@ -100,8 +102,8 @@ class BlenderRodCallback(CallBackBaseClass):
 
     def initialize(self, system) -> None:
         self.bsr_rod = Rod(
-            system.position_collection,
-            system.radius,
+            system.position_collection * self.scale,
+            system.radius * self.scale,
         )
 
         self.bsr_splines_alpha = []
@@ -118,7 +120,7 @@ class BlenderRodCallback(CallBackBaseClass):
                 system.alpha_angle,
             )
             self.bsr_splines_alpha.append(
-                BezierSplinePipe(positions=positions, radii=radii)
+                BezierSplinePipe(positions=positions * self.scale, radii=radii * self.scale)
             )
 
         # Add beta angle
@@ -133,13 +135,13 @@ class BlenderRodCallback(CallBackBaseClass):
                 system.beta_angle,
             )
             self.bsr_splines_beta.append(
-                BezierSplinePipe(positions=positions, radii=radii)
+                BezierSplinePipe(positions=positions * self.scale, radii=radii * self.scale)
             )
 
     def update_states(self, system) -> None:
         self.bsr_rod.update_states(
-            positions=system.position_collection,
-            radii=system.radius,
+            positions=system.position_collection * self.scale,
+            radii=system.radius * self.scale,
         )
 
         # Add alpha angle
@@ -153,7 +155,7 @@ class BlenderRodCallback(CallBackBaseClass):
                 system.tangents,
                 system.alpha_angle,
             )
-            self.bsr_splines_alpha[i].update_states(positions=positions, radii=radii)
+            self.bsr_splines_alpha[i].update_states(positions=positions * self.scale, radii=radii * self.scale)
 
         # Add beta angle
         for i in range(self.num_splines):
@@ -166,7 +168,7 @@ class BlenderRodCallback(CallBackBaseClass):
                 system.tangents,
                 system.beta_angle,
             )
-            self.bsr_splines_beta[i].update_states(positions=positions, radii=radii)
+            self.bsr_splines_beta[i].update_states(positions=positions * self.scale, radii=radii * self.scale)
 
     def update_keyframes(self) -> None:
         self.bsr_rod.set_keyframe(self.key_frame)
