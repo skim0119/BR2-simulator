@@ -149,10 +149,11 @@ class Environment:
     def __init__(
         self,
         run_tag: str,
-        rendering_fps: int = 25,
+        rendering_fps: int | None = 25,
         time_step: float = 2.0e-5,
         capture_interval: Optional[tuple[float, float]] = None,
         export_blender: bool = False,
+        visualize_alpha_beta: bool = True,
     ):
         # Integrator type (pyelastica==0.2.2 only provide PositionVerlet)
         self.StatefulStepper = PositionVerlet()
@@ -165,14 +166,19 @@ class Environment:
         self.time_step = time_step
 
         # Recording speed
-        self.step_skip = max(1, int(1.0 / (rendering_fps * self.time_step)))
-        self.rendering_fps = rendering_fps
+        if rendering_fps is None:
+            self.step_skip = 1
+            self.rendering_fps = 25
+        else:
+            self.step_skip = max(1, int(1.0 / (rendering_fps * self.time_step)))
+            self.rendering_fps = rendering_fps
         self.capture_interval = capture_interval
         self.export_blender = export_blender
         if self.export_blender:
             import bsr
 
             bsr.clear_mesh_objects()
+            bsr.set_view_distance(0.8)
 
         # Rod
         self.shearable_rods = {}
@@ -185,11 +191,14 @@ class Environment:
         self.acceleration_threshold = 10 ** (0)
         self.alpha_threshold = 1.0e1
 
+        self.visualize_alpha_beta = visualize_alpha_beta
+
     def reset(
         self,
         rod_database_path: str,
         assembly_config_path: str,
         start_time: float = 0.0,
+        verbose: bool = True,
         **kwargs,
     ) -> None:
         """
@@ -210,7 +219,9 @@ class Environment:
         self.assy = FreeAssembly(self, **kwargs)
 
         """rod name -> [seg,rod]"""
-        self.shearable_rods = self.assy.build(rod_database_path, assembly_config_path)
+        self.shearable_rods = self.assy.build(
+            rod_database_path, assembly_config_path, verbose=verbose
+        )
         self.simulator = self.assy.simulator
 
         # Collect data using callback function for postprocessing
@@ -223,6 +234,7 @@ class Environment:
                 self.step_skip,
                 time_interval=self.capture_interval,
                 callback_class=BlenderRodCallback,
+                visualize_alpha_beta=self.visualize_alpha_beta,
             )  # [seg,rod]
 
         # Finalize simulation environment. After finalize, you cannot add
@@ -588,4 +600,5 @@ class Environment:
         if self.export_blender:
             import bsr
 
+            bsr.frame_manager.frame_end
             bsr.save(blender_path)

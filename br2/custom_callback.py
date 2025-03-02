@@ -5,7 +5,56 @@ import numpy as np
 from elastica import CallBackBaseClass
 from elastica.typing import RodType
 
-from bsr import Rod, BezierSplinePipe
+from bsr import frame_manager
+from bsr import BezierSplinePipe
+
+from bsr import RodWithCylinder as Rod
+
+# from bsr import RodWithBox as Rod
+
+
+class FreeCallback(CallBackBaseClass):
+    def __init__(self, step_skip: int, callback_params: dict, time_interval=None):
+        CallBackBaseClass.__init__(self)
+        self.every = step_skip
+        self.time_interval = time_interval
+        self.callback_params = callback_params
+
+    def make_callback(self, system, time, current_step: int):
+        if current_step % self.every != 0:
+            return
+        if self.time_interval is not None and (
+            time < self.time_interval[0] or time > self.time_interval[1]
+        ):
+            return
+        self.callback_params["time"].append(time)
+        self.callback_params["step"].append(current_step)
+        self.callback_params["position"].append(system.position_collection.copy())
+        self.callback_params["velocity"].append(system.velocity_collection.copy())
+        self.callback_params["acceleration"].append(
+            system.acceleration_collection.copy()
+        )
+        self.callback_params["omega"].append(system.omega_collection.copy())
+        self.callback_params["alpha"].append(system.alpha_collection.copy())
+        self.callback_params["director"].append(system.director_collection.copy())
+        self.callback_params["external_forces"].append(system.external_forces.copy())
+        self.callback_params["external_torques"].append(system.external_torques.copy())
+        self.callback_params["internal_forces"].append(system.internal_forces.copy())
+        self.callback_params["internal_torques"].append(system.internal_torques.copy())
+        self.callback_params["kappa"].append(system.kappa.copy())
+        self.callback_params["sigma"].append(system.sigma.copy())
+        self.callback_params["lengths"].append(system.lengths.copy())
+        self.callback_params["dilatation"].append(system.dilatation.copy())
+        self.callback_params["radius"].append(system.radius.copy())
+        self.callback_params["com"].append(
+            system.compute_position_center_of_mass().copy()
+        )
+        # self.callback_params["vcom"].append(system.compute_velocity_center_of_mass())
+
+        self.callback_params["volume"].append(system.volume.copy())
+        self.callback_params["alpha_angle"].append(system.alpha_angle.copy())
+        self.callback_params["beta_angle"].append(system.beta_angle.copy())
+        self.callback_params["delta_turn"].append(system.delta_turn.copy())
 
 
 class BlenderRodCallback(CallBackBaseClass):
@@ -14,7 +63,7 @@ class BlenderRodCallback(CallBackBaseClass):
     """
 
     def __init__(
-        self, step_skip: int, time_interval: int, callback_params=None, **kwargs
+        self, step_skip: int, time_interval: int, callback_params=None, visualize_alpha_beta=True, **kwargs
     ) -> None:
         CallBackBaseClass.__init__(self, **kwargs)
         self.every = step_skip
@@ -26,6 +75,8 @@ class BlenderRodCallback(CallBackBaseClass):
         self.bsr_splines_alpha: list[BezierSplinePipe]
         self.bsr_splines_beta: list[BezierSplinePipe]
         self.num_splines = 1
+
+        self.visualize_alpha_beta = visualize_alpha_beta
 
     def make_callback(
         self, system: RodType, time: np.floating, current_step: int
@@ -100,12 +151,17 @@ class BlenderRodCallback(CallBackBaseClass):
 
     def initialize(self, system) -> None:
         self.bsr_rod = Rod(
-            system.position_collection,
-            system.radius,
+            positions=system.position_collection,
+            radii=system.radius,
+            # system.director_collection,
         )
 
         self.bsr_splines_alpha = []
         self.bsr_splines_beta = []
+
+        if not self.visualize_alpha_beta:
+            return
+
         # Add alpha angle
         for i in range(self.num_splines):
             positions, radii = self.find_helix(
@@ -140,7 +196,11 @@ class BlenderRodCallback(CallBackBaseClass):
         self.bsr_rod.update_states(
             positions=system.position_collection,
             radii=system.radius,
+            # directors=system.director_collection,
         )
+
+        if not self.visualize_alpha_beta:
+            return
 
         # Add alpha angle
         for i in range(self.num_splines):
@@ -169,9 +229,11 @@ class BlenderRodCallback(CallBackBaseClass):
             self.bsr_splines_beta[i].update_states(positions=positions, radii=radii)
 
     def update_keyframes(self) -> None:
-        self.bsr_rod.set_keyframe(self.key_frame)
-        for spline in self.bsr_splines_alpha:
-            spline.set_keyframe(self.key_frame)
-        for spline in self.bsr_splines_beta:
-            spline.set_keyframe(self.key_frame)
+        self.bsr_rod.update_keyframe(self.key_frame)
+        if self.visualize_alpha_beta:
+            for spline in self.bsr_splines_alpha:
+                spline.update_keyframe(self.key_frame)
+            for spline in self.bsr_splines_beta:
+                spline.update_keyframe(self.key_frame)
         self.key_frame += 1
+        frame_manager.current_frame = self.key_frame
