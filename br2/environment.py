@@ -156,6 +156,7 @@ class Environment:
         time_step: float = 2.0e-5,
         capture_interval: Optional[tuple[float, float]] = None,
         export_blender: bool = False,
+        visualize_alpha_beta: bool = True,
     ):
         # Integrator type (pyelastica==0.2.2 only provide PositionVerlet)
         self.StatefulStepper = PositionVerlet()
@@ -192,6 +193,8 @@ class Environment:
         self.omega_threshold = 1.0e-3
         self.acceleration_threshold = 10 ** (0)
         self.alpha_threshold = 1.0e1
+
+        self.visualize_alpha_beta = visualize_alpha_beta
 
     def reset(
         self,
@@ -235,6 +238,7 @@ class Environment:
                 self.step_skip,
                 time_interval=self.capture_interval,
                 callback_class=BlenderRodCallback,
+                visualize_alpha_beta=self.visualize_alpha_beta,
             )  # [seg,rod]
         if plot_states_online:
             self.assy.generate_callbacks(
@@ -627,7 +631,7 @@ class Environment:
         if self.export_blender:
             import bsr
 
-            bsr.frame_manager.set_frame_end()
+            bsr.frame_manager.frame_end
             bsr.save(blender_path)
 
 
