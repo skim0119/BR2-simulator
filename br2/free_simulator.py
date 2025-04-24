@@ -24,14 +24,16 @@ from br2.rod.cosserat_rod import FreeCosseratRod
 from br2.surface_connection import (
     SurfaceJointSideBySide,
     get_connection_vector_straight_straight_rod,
+    get_connection_directors_straight_straight_rod,
 )
 
 from br2.free_custom_systems import (
+    TipLoad,
     FreeBendActuation,
-    FreeTwistActuation,
     FreeBaseEndSoftFixed,
     FreeCombinedActuation,
 )
+from br2.custom_callback import FreeCallback
 from br2.custom_dissipation import AnalyticalLinearDamperV2, LaplaceDissipationFilterV2
 from br2.modules.base_system import BaseSystemCollection as CustomBaseSystemCollection
 from br2.modules.base_system import BaseSystemCollection as CustomBaseSystemCollection
@@ -45,76 +47,39 @@ class BR2Simulator(
     # Connections,
     MemoryBlockConnections,
     Forcing,
+    Contact,
     Damping,
     CallBacks,
 ):
     pass
 
 
-class FreeCallback(CallBackBaseClass):
-    def __init__(self, step_skip: int, callback_params: dict, time_interval=None):
-        CallBackBaseClass.__init__(self)
-        self.every = step_skip
-        self.time_interval = time_interval
-        self.callback_params = callback_params
-
-    def make_callback(self, system, time, current_step: int):
-        if current_step % self.every != 0:
-            return
-        if self.time_interval is not None and (
-            time < self.time_interval[0] or time > self.time_interval[1]
-        ):
-            return
-        self.callback_params["time"].append(time)
-        self.callback_params["step"].append(current_step)
-        self.callback_params["position"].append(system.position_collection.copy())
-        self.callback_params["velocity"].append(system.velocity_collection.copy())
-        self.callback_params["acceleration"].append(
-            system.acceleration_collection.copy()
-        )
-        self.callback_params["omega"].append(system.omega_collection.copy())
-        self.callback_params["alpha"].append(system.alpha_collection.copy())
-        self.callback_params["director"].append(system.director_collection.copy())
-        self.callback_params["external_forces"].append(system.external_forces.copy())
-        self.callback_params["external_torques"].append(system.external_torques.copy())
-        self.callback_params["internal_forces"].append(system.internal_forces.copy())
-        self.callback_params["internal_torques"].append(system.internal_torques.copy())
-        self.callback_params["kappa"].append(system.kappa.copy())
-        self.callback_params["sigma"].append(system.sigma.copy())
-        self.callback_params["lengths"].append(system.lengths.copy())
-        self.callback_params["dilatation"].append(system.dilatation.copy())
-        self.callback_params["radius"].append(system.radius.copy())
-        self.callback_params["com"].append(
-            system.compute_position_center_of_mass().copy()
-        )
-        # self.callback_params["vcom"].append(system.compute_velocity_center_of_mass())
-
-        self.callback_params["volume"].append(system.volume.copy())
-        self.callback_params["alpha_angle"].append(system.alpha_angle.copy())
-        self.callback_params["beta_angle"].append(system.beta_angle.copy())
-        self.callback_params["delta_turn"].append(system.delta_turn.copy())
-
-
 class FreeAssembly:
-    def __init__(self, env, gravity=False, **kwargs):
+    def __init__(self, env, gravity=False, REMOVE_CONNECTION:bool=False, **kwargs):
         self.env = env
 
         self.simulator = BR2Simulator()
-        self.actuation = defaultdict(list)
+        self.actuation = defaultdict(lambda: [0.0])
         self.free = {}  # Key: <segment name>_<order>_<rod name>
 
         # Parameter
-        self.toggle_gravity = gravity
+        self.toggle_gravity: bool = gravity
+        self.num_activation: int = 0
+        self.num_segment: int = 0
 
         # Scale by modulus
         self.k_multiplier = kwargs.get("k_multiplier", 0.166) * 1e6
         self.nu_multiplier = kwargs.get("nu_multiplier", 0)  # Scale from 0 to 1
-        self.kt_multiplier = kwargs.get("kt_multiplier", 1)
+        self.k_torsion_multiplier = kwargs.get("k_torsion_multiplier", 5e3)
+        self.k_torsion_multiplier_serial = kwargs.get("k_torsion_multiplier_serial", 5e3)
         self.k_repulsive_multiplier = kwargs.get("k_repulsive", 2) * 1e6
         # DEBUG
-        print(
-            f"  {self.k_multiplier=} {self.nu_multiplier=} {self.kt_multiplier=} {self.k_repulsive_multiplier=}"
-        )
+        # print(
+        #     f"  {self.k_multiplier=} {self.nu_multiplier=} {self.kt_multiplier=} {self.k_repulsive_multiplier=}"
+        # )
+
+        # DEBUG_CONFIGURATION
+        self.REMOVE_CONNECTION = REMOVE_CONNECTION
 
     def save_state(self, **kwargs):
         # kwargs: directory, time, verbose
@@ -124,17 +89,24 @@ class FreeAssembly:
         # kwargs: directory, verbose
         load_state(self.simulator, **kwargs)
 
-    def build(self, rod_info, connect_info, verbose=True, debug=False):
+    def build(
+        self,
+        rod_info,
+        connect_info,
+        verbose: bool = True,
+        debug: bool = False,
+        prepend_tag: str = "",
+    ):
         """
         if not verbose:
             print = lambda *x: False  # Bypass the print call
         """
 
-        """import rods"""
-        with open(rod_info) as json_data_file:
-            rod_info = json.load(json_data_file)
-        rod_specs = rod_info["Rods"]
-        default_rod_spec = rod_info["DefaultParams"]
+        # import rod configuration
+        with open(rod_info, "r") as json_data_file:
+            rod_config = json.load(json_data_file)
+        rod_specs = rod_config["Rods"]
+        default_rod_spec = rod_config["DefaultParams"]
         for k in rod_specs.keys():  # Update default parameter if doesn't existe
             rod_spec = rod_specs[k]
             rod_spec.update(
@@ -145,20 +117,21 @@ class FreeAssembly:
                 }
             )
 
-        """import segments and activations. construct rod_name"""
+        # import segments and activations. construct rod_name
         with open(connect_info) as json_data_file:
             connect_spec = json.load(json_data_file)
             segments = connect_spec["Segments"]
             activations = connect_spec["Activations"]
-        self.num_activation = len(activations)
+        self.num_activation += len(activations)
 
-        """create segment"""
-        self.num_segment = len(segments)
+        # create segment
+        self.num_segment += len(segments)
         start_y_position = 0.0
         prev_seg_rods = None
+        frees = {}
         for seg_idx, seg_name in enumerate(segments):  # create segment rods
 
-            """create rods"""
+            # create rods
             seg = segments[seg_name]
             seg_rods = []
             seg_lengths, seg_n_elements = [], []  # for assertion
@@ -167,6 +140,8 @@ class FreeAssembly:
                 base_position = seg["base_position"][rod_i]
                 y_rotation = seg["y-rotation"][rod_i]
                 rod_name = "%s_%d_%s" % (seg_name, rod_i, rod_type)
+                if prepend_tag:
+                    rod_name = f"{prepend_tag}_{rod_name}"
 
                 rod_spec = rod_specs[rod_type].copy()
 
@@ -175,19 +150,20 @@ class FreeAssembly:
                 seg_lengths.append(rod_spec["base_length"])
                 seg_n_elements.append(rod_spec["n_elements"])
                 rod_pos = np.array(base_position)
-                longitudinal_index = np.argmax(rod_spec["direction"])
-                rod_pos = np.insert(rod_pos, longitudinal_index, start_y_position)
+                longitudinal_index = np.argmax(np.abs(rod_spec["direction"]))
+                sign = np.sign(rod_spec["direction"][longitudinal_index])
+                rod_pos = np.insert(
+                    rod_pos, longitudinal_index, sign * start_y_position
+                )
                 rod_spec["start"] = rod_pos
                 rod_spec["is_first_segment"] = True if seg_idx == 0 else False
                 rod_spec["base_radius"] = rod_spec["outer_radius"]
 
                 # Set fiber angles
                 if "gamma" in rod_spec:
-                    rod_spec["gamma"] = [
-                        angle + y_rotation for angle in rod_spec["gamma"]
-                    ]
+                    rod_spec["gamma"] = rod_spec["gamma"] + y_rotation
                 else:
-                    rod_spec["gamma"] = []
+                    rod_spec["gamma"] = None
                 if "alpha" in rod_spec:
                     rod_spec["alpha_fiber_angle"] = rod_spec["alpha"]
                 if "beta" in rod_spec:
@@ -201,10 +177,14 @@ class FreeAssembly:
                             actuation_name = _actuation_name
                     if actuation_name is not None:
                         break
+                if prepend_tag:
+                    actuation_name = f"{prepend_tag}_{actuation_name}"
 
-                rod = self.add_free(rod_name, actuation_name, **rod_spec)
+                rod = self.add_free(
+                    rod_name, actuation_name, verbose=verbose, **rod_spec
+                )
 
-                self.free[rod_name] = rod
+                frees[rod_name] = rod
                 seg_rods.append(rod_name)
             assert seg_lengths.count(seg_lengths[0]) == len(
                 seg_lengths
@@ -215,69 +195,62 @@ class FreeAssembly:
             start_y_position += seg_lengths[0]
 
             """Parallel Connection"""
-            if len(seg_rods) > 1:
-                print("connecting in parallel...")
+            if not self.REMOVE_CONNECTION and len(seg_rods) > 1:
+                if verbose:
+                    print("connecting in parallel...")
                 for rod_i in range(len(seg_rods)):
                     first_rod_name = seg_rods[rod_i - 1]
                     second_rod_name = seg_rods[rod_i]
-                    print(
-                        f"    connecting seg {seg_idx}: {first_rod_name} || {second_rod_name}"
-                    )
+                    if verbose:
+                        print(
+                            f"    connecting seg {seg_idx}: {first_rod_name} || {second_rod_name}"
+                        )
                     self.add_parallel_connection(
                         first_rod_name,
                         second_rod_name,
                     )
 
-            if seg_idx > 0:
+            if not self.REMOVE_CONNECTION and seg_idx > 0:
                 """Serial Connection"""
-                print("connecting in serial...")
-                print("  connecting seg-%d and seg-%d" % (seg_idx, seg_idx + 1))
-                print(f"  previous segment rods: {prev_seg_rods}")
-                print(f"  current segment rods: {seg_rods}")
+                if verbose:
+                    print("connecting in serial...")
+                    print("  connecting seg-%d and seg-%d" % (seg_idx, seg_idx + 1))
+                    print(f"  previous segment rods: {prev_seg_rods}")
+                    print(f"  current segment rods: {seg_rods}")
                 self.add_serial_connection(
                     prev_seg_rods,
                     seg_rods,
                 )
 
+                # FIXME : Temporary
+                # self.add_tip_load(seg_rods)
+
             prev_seg_rods = seg_rods.copy()
 
-        # Debug Mode
-        if debug:
-            # Plot base of the first segment
-            # TODO: check
-            import matplotlib.pyplot as plt
+        self.free.update(frees)
 
-            plt.plot(
-                self.free["seg1_0_R2"].position_collection[0, 0],
-                self.free["seg1_0_R2"].position_collection[2, 0],
-                "rx",
+        return frees
+
+    def add_tip_load(self, rods):
+        weight = 0.027 / len(rods)
+        for rod_name in rods:
+            rod = self.free[rod_name]
+            self.simulator.add_forcing_to(rod).using(
+                TipLoad,
+                start_force=np.zeros(3),
+                end_force=np.array([0, 0, -1]) * weight,
+                ramp_up_time=1.0,
             )
-            plt.plot(
-                self.free["seg1_1_R4"].position_collection[0, 0],
-                self.free["seg1_1_R4"].position_collection[2, 0],
-                "bx",
-            )
-            plt.plot(
-                self.free["seg1_2_R2"].position_collection[0, 0],
-                self.free["seg1_2_R2"].position_collection[2, 0],
-                "gx",
-            )
-            plt.show(block=False)
 
-        self.shearable_rods = self.free
-
-        return self.shearable_rods
-
-    def generate_callbacks(self, step_skip, time_interval=None, callback_class=None):
-        data_rods = []
+    def generate_callbacks(self, step_skip, time_interval=None, callback_class=None, **kwargs):
+        data_rods = {}
         for rod_name in self.free.keys():
-            data_rods.append(
-                self.add_callback(
-                    rod_name,
-                    step_skip,
-                    time_interval=time_interval,
-                    callback=callback_class,
-                )
+            data_rods[rod_name] = self.add_callback(
+                rod_name,
+                step_skip,
+                time_interval=time_interval,
+                callback=callback_class,
+                **kwargs,
             )
         return data_rods
 
@@ -291,14 +264,36 @@ class FreeAssembly:
     def get_actuation_reference(self, actuation_name=None):
         if actuation_name is not None:
             actuation_ref = self.actuation[actuation_name]
-            actuation_ref.append(0.0)
+            # actuation_ref.append(0.0)  # Remove?
             return actuation_ref
         else:
             return None
 
     def create_rod(self, name, is_first_segment=True, verbose=False, **rod_spec):
-        # Create new rod
-        rod = FreeCosseratRod.straight_rod(**rod_spec)
+        if rod_spec.get("prebuilt", False):
+            smoothing_path = rod_spec["smoothing_path"]
+            smoothing_slice = rod_spec["smoothing_slice"]
+            data = np.load(smoothing_path)
+            positions = data["position"][
+                0, :, int(smoothing_slice[0]) : int(smoothing_slice[1]) + 1
+            ]
+            directors = data["director"][
+                0, :, :, int(smoothing_slice[0]) : int(smoothing_slice[1])
+            ]
+            rod = FreeCosseratRod.straight_rod(
+                **rod_spec, position=positions, directors=directors
+            )
+            rod.compute_internal_forces_and_torques(0)
+            rod = FreeCosseratRod.straight_rod(
+                **rod_spec,
+                position=positions,
+                directors=directors,
+                rest_sigma=rod.sigma,
+                rest_kappa=rod.kappa,
+            )
+        else:
+            # Create new rod
+            rod = FreeCosseratRod.straight_rod(**rod_spec)
         rod.outer_radius = rod_spec["outer_radius"]
         rod.inner_radius = rod_spec["inner_radius"]
         self.free[name] = rod
@@ -306,7 +301,7 @@ class FreeAssembly:
         # Append rod to simulator
         self.simulator.append(rod)
 
-        if getattr(rod_spec, "hollow", False):
+        if rod_spec.get("hollow", True):  # By default, hollow
             outer_radius = rod.outer_radius
             inner_radius = rod.inner_radius
             hollow_scale_bend = ((2 * outer_radius) ** 4 - (2 * inner_radius) ** 4) / (
@@ -315,8 +310,22 @@ class FreeAssembly:
             hollow_scale_shear = ((2 * outer_radius) ** 2 - (2 * inner_radius) ** 2) / (
                 (2 * outer_radius) ** 2
             )
-            rod.bend_matrix = hollow_scale_bend * rod.bend_matrix
-            rod.shear_matrix = hollow_scale_shear * rod.shear_matrix
+            rod.bend_matrix[:2, :2, :] *= hollow_scale_bend
+            rod.shear_matrix[:2, :2, :] *= hollow_scale_shear
+
+            rod.mass[:] = 0.0
+            rod.mass[:-1] += 0.5 * (
+                rod.density
+                * np.pi
+                * (outer_radius**2 - inner_radius**2)
+                * rod.rest_lengths
+            )
+            rod.mass[1:] += 0.5 * (
+                rod.density
+                * np.pi
+                * (outer_radius**2 - inner_radius**2)
+                * rod.rest_lengths
+            )
 
         # add damping
         if "damping_constant" in rod_spec:
@@ -332,58 +341,25 @@ class FreeAssembly:
             )
 
         # Constrain one end of the rod (TODO : Modify for serial connection)
-        if is_first_segment:
+        if True and is_first_segment:
             self.simulator.constrain(rod).using(
                 FreeBaseEndSoftFixed,
-                constrained_position_idx=(0,),
-                constrained_director_idx=(0,),
+                constrained_position_idx=(0, 1, 2, 3, 4),
+                constrained_director_idx=(0, 1, 2, 3, 4),
                 k=1e9,
                 nu=0,
                 kt=0.0,
             )
 
         # Gravity
-        if self.toggle_gravity:
+        if True and self.toggle_gravity:
             self.simulator.add_forcing_to(rod).using(
                 GravityForces,
-                acc_gravity=np.array([0.0, 9.80665, 0.0]),  # Reverse direction
+                # acc_gravity=np.array([0.0, 9.80665, 0.0]),  # Reverse direction
+                acc_gravity=np.array([0.0, 0.0, -9.80665]),  # Reverse direction
             )
 
         return rod
-
-    def add_angled_fibers(self, rod, actuation_ref, fiber_angles: list):
-        # TODO: Deprecated. Remove later
-        for alpha in fiber_angles:
-            angle = alpha * np.pi / 180
-            scale = (
-                np.pi
-                * (rod.inner_radius**3)
-                * ((np.sin(angle) ** 2) + 2 * (np.cos(angle) ** 2))
-                / (np.sin(2 * angle))
-            )
-            self.simulator.add_forcing_to(rod).using(
-                FreeTwistActuation, actuation_ref, scale=scale
-            )
-
-    def add_straight_fibers(self, rod, actuation_ref, fiber_angles: list):
-        scale = np.pi * rod.radius[-1] * (rod.inner_radius**2)
-        for gamma in fiber_angles:
-            self.simulator.add_forcing_to(rod).using(
-                FreeBendActuation,
-                actuation_ref,
-                z_angle=gamma * np.pi / 180.0,
-                scale=scale,
-            )
-
-    def add_elongation_force(self, rod, actuation_ref):
-        # scale = np.pi * rod.inner_radius ** 2
-        scale = 1.0  # np.pi * rod.inner_radius ** 2
-        print(f"  actuation addded: elongation scale {scale}")
-        self.simulator.add_forcing_to(rod).using(
-            FreeCombinedActuation,
-            actuation_ref,
-            scale=scale,
-        )
 
     def add_free(
         self,
@@ -391,31 +367,36 @@ class FreeAssembly:
         actuation_name,
         alpha: float,
         beta: float,
-        gamma: list[float],
+        gamma: float | None = None,
+        verbose: bool = True,
         **rod_spec,
     ):
         # Create rod
-        rod = self.create_rod(name, **rod_spec)
+        rod = self.create_rod(name, verbose=verbose, **rod_spec)
         actuation_ref = self.get_actuation_reference(actuation_name)
 
         # Add fiber
         if actuation_ref is not None:
-            scale = 1.0  # TODO: maybe remove later
-            self.simulator.add_forcing_to(rod).using(
-                FreeCombinedActuation,
-                actuation_ref,
-                scale=scale,
-            )
-            if len(gamma) > 0:
-                self.add_straight_fibers(rod, actuation_ref, gamma)
-
-            # TODO: Remove below later
-            # if len(alpha) == 0 and len(beta) == 0 and len(gamma) == 0:
-            #    self.add_elongation_force(rod, actuation_ref)
-            # else:
-            #    self.add_angled_fibers(rod, actuation_ref, alpha)
-            #    self.add_angled_fibers(rod, actuation_ref, beta)
-            #    self.add_straight_fibers(rod, actuation_ref, gamma)
+            ramp_up_time = rod_spec.get("ramp_up_time", 1.0)
+            if gamma is not None:
+                scale = rod_spec.get("moment_scale", 1.0)
+                gamma_tilt = rod_spec.get("gamma_tilt", 0.0)
+                self.simulator.add_forcing_to(rod).using(
+                    FreeBendActuation,
+                    actuation_ref,
+                    z_angle=gamma * np.pi / 180.0,
+                    scale=scale,
+                    gamma_tilt=gamma_tilt,
+                    ramp_up_time=ramp_up_time,
+                )
+            else:
+                scale = rod_spec.get("twist_scale", 1.0)
+                self.simulator.add_forcing_to(rod).using(
+                    FreeCombinedActuation,
+                    actuation_ref,
+                    scale=scale,
+                    ramp_up_time=ramp_up_time,
+                )
 
         return rod
 
@@ -451,6 +432,12 @@ class FreeAssembly:
             rod_one_idx=(0, rod_one.n_elems),
             rod_two_idx=(0, rod_two.n_elems),
         )
+        offset_rotation_btw_rods = get_connection_directors_straight_straight_rod(
+            rod_one=rod_one,
+            rod_two=rod_two,
+            rod_one_idx=(0, rod_one.n_elems),
+            rod_two_idx=(0, rod_two.n_elems),
+        )
 
         n_elems = rod_one.n_elems
 
@@ -473,6 +460,7 @@ class FreeAssembly:
                 k=k_conn * self.k_multiplier,
                 nu=self.nu_multiplier,
                 k_repulsive=k_conn * self.k_repulsive_multiplier,
+                k_torsion=k_conn * self.k_torsion_multiplier,
                 rod_one_direction_vec_in_material_frame=rod_one_direction_vec_in_material_frame[
                     ..., i
                 ],
@@ -480,6 +468,7 @@ class FreeAssembly:
                     ..., i
                 ],
                 offset_btw_rods=offset_btw_rods[i],
+                offset_rotation_btw_rods=offset_rotation_btw_rods[..., i],
             )
 
     def tip_to_base_connection(self, rod_one, rod_two):
@@ -493,6 +482,12 @@ class FreeAssembly:
             rod_one_idx=(rod_one.n_elems - 1, rod_one.n_elems),
             rod_two_idx=(0, 1),
         )
+        offset_rotation_btw_rods = get_connection_directors_straight_straight_rod(
+            rod_one=rod_one,
+            rod_two=rod_two,
+            rod_one_idx=(rod_one.n_elems - 1, rod_one.n_elems),
+            rod_two_idx=(0, 1),
+        )
         rod_one_direction_vec_in_material_frame = (
             rod_one_direction_vec_in_material_frame[..., 0]
         )
@@ -500,6 +495,7 @@ class FreeAssembly:
             rod_two_direction_vec_in_material_frame[..., 0]
         )
         offset_btw_rods = offset_btw_rods[0]
+        offset_rotation_btw_rods = offset_rotation_btw_rods[..., 0]
         rod_one_idx = rod_one.n_elems - 1
         rod_two_idx = 0
 
@@ -511,6 +507,10 @@ class FreeAssembly:
             / (rod_one.radius[rod_one_idx] + rod_two.radius[rod_two_idx])
         )
 
+        print(f"  connecting tip to base: {rod_one} || {rod_two}")
+        print(f"    {k_conn=}, {self.k_multiplier=}, {self.nu_multiplier=}")
+        print(f"    {self.k_torsion_multiplier=}")
+
         self.simulator.connect(
             first_rod=rod_one,
             second_rod=rod_two,
@@ -518,10 +518,12 @@ class FreeAssembly:
             second_connect_idx=rod_two_idx,
         ).using(
             SurfaceJointSideBySide,
-            k=k_conn * self.k_multiplier,
-            nu=self.nu_multiplier,
+            k=k_conn * self.k_multiplier * 1e1,
+            nu=self.nu_multiplier + 1e-4,
             k_repulsive=0.0,
+            k_torsion=k_conn * self.k_torsion_multiplier_serial,
             rod_one_direction_vec_in_material_frame=rod_one_direction_vec_in_material_frame,
             rod_two_direction_vec_in_material_frame=rod_two_direction_vec_in_material_frame,
             offset_btw_rods=offset_btw_rods,
+            offset_rotation_btw_rods=offset_rotation_btw_rods,
         )

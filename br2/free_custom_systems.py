@@ -1,11 +1,12 @@
 from elastica import *
+from elastica import NoForces
 
 from elastica.utils import Tolerance
 
-from elastica._calculus import _clip_array
-from elastica._linalg import _batch_cross, _batch_dot, _batch_norm, _batch_matvec
+from elastica._linalg import _batch_cross, _batch_dot
 from elastica._linalg import _batch_product_i_k_to_ik
 from elastica.boundary_conditions import ConstraintBase
+from elastica.external_forces import EndpointForces
 
 from br2.linalg import (
     _single_inv_rotate,
@@ -14,84 +15,178 @@ from br2.linalg import (
 import numpy as np
 import numba
 from numba import njit
+import matplotlib.pyplot as plt
+
+
+class TipLoad(EndpointForces):
+    def apply_forces(self, system, time):
+        if time > 28.3:
+            super().apply_forces(system, time)
 
 
 # Defining Variable Bending
 class FreeBendActuation(NoForces):
-    # TODO
 
-    def __init__(self, actuation_ref, z_angle, scale, ramp_up_time=0.2):
+    def __init__(self, actuation_ref, z_angle, scale, ramp_up_time=1.0, gamma_tilt=0.0):
         super(FreeBendActuation, self).__init__()
         self.actuation_ref = actuation_ref
         self.z_angle = z_angle
-        self.magnitude_scale = scale  # TODO
-        """
-        Currently we are using scale to externally compute the moment scale.
-        We are assuming the radius is not changing as it deform.
-        If we want to incorporate the change in radius, we cannot use default
-        CR radius, since the basic CR is implemented assuming solid cylinder
-        """
-        self.ramp_up_time = ramp_up_time
-
-    def apply_torques(self, system, time: float = 0.0):
-        factor = min(1.0, time / self.ramp_up_time)
-        torque_mag = self.actuation_ref[0] * self.magnitude_scale * factor
-        local_unit_vector = np.array([np.cos(self.z_angle), np.sin(self.z_angle), 0.0])
-        torque = torque_mag * local_unit_vector
-        # system.external_torques[..., -1] += torque
-        # """ Not used: (uniformly distributed torque) """
-        # return
-        n_elems = system.n_elems
-        torque_on_one_element = (
-            _batch_product_i_k_to_ik(torque, np.ones((n_elems))) / n_elems
-        )
-        # system.external_torques += _batch_matvec(
-        #    system.director_collection, torque_on_one_element
-        # )
-        system.external_torques += torque_on_one_element
-
-
-# Defining Variable Torque
-class FreeTwistActuation(NoForces):
-    # TODO
-
-    def __init__(self, actuation_ref, scale, ramp_up_time=0.2):
-        """
-
-        Parameters
-        ----------
-        actuation_ref: list
-        scale: float
-        """
-        super(FreeTwistActuation, self).__init__()
-        self.actuation_ref = actuation_ref
-        self.direction = np.array([0.0, 0.0, 1.0])  # Rod always in tangent
+        self.gamma_tilt = gamma_tilt
         self.scale = scale
         self.ramp_up_time = ramp_up_time
 
-    """
-    def apply_forces(self, system, time: float = 0.0):
+    def apply_torques(self, system, time=0.0):
         factor = min(1.0, time / self.ramp_up_time)
-        force_on_one_element = self.torque[0] / 3.14742e-2 * factor # TODO: double check the ratio
-        tangents = system.tangents[...]
-        system.external_forces[..., 0] -= factor * 0.5 * force_on_one_element * tangents[..., 0]
-        system.external_forces[..., -1] += factor * 0.5 * force_on_one_element * tangents[..., -1]
-        system.external_forces[..., 1:-1] += (
-            factor * 0.5 * force_on_one_element
-            * (tangents[..., :-1] - tangents[..., 1:])
-        )
-    """
+        pressure = self.actuation_ref[0] * self.scale * factor
+        # torque = pressure * self.local_unit_vector / system.n_elems
+        # torque_on_each_element = (
+        #    _batch_product_i_k_to_ik(torque, np.ones((system.n_elems)))
+        # )
+        # system.external_torques += torque_on_each_element
+        # return
 
-    def apply_torques(self, system, time: float = 0.0):
-        factor = min(1.0, time / self.ramp_up_time)
-        torque = self.actuation_ref[0] * self.scale * self.direction * factor
-        n_elems = system.n_elems
-        torques = _batch_product_i_k_to_ik(torque, np.ones((n_elems))) / n_elems
-        system.external_torques[..., 2:-2] += torques[..., 2:-2]
+        self.nb_apply_moment(
+            self.z_angle,
+            self.gamma_tilt,
+            system.lengths,
+            rod_external_forces=system.external_forces,
+            rod_external_torques=system.external_torques,
+            pressure=pressure,
+            radius=system.radius,
+            alpha_angle=system.alpha_angle,
+            beta_angle=system.beta_angle,
+            # alpha_angle=system.initial_alpha_angle,
+            # beta_angle=system.initial_beta_angle,
+            tangents=system.tangents,
+            n_elems=system.n_elems,
+            skip_element_pre=0,
+            skip_element_post=0,
+        )
+
+    @staticmethod
+    @njit(cache=True)
+    def nb_apply_moment(
+        z_angle,
+        gamma_tilt,
+        lengths,
+        rod_external_forces,
+        rod_external_torques,
+        pressure,
+        radius,
+        alpha_angle,
+        beta_angle,
+        tangents,
+        n_elems,
+        skip_element_pre,
+        skip_element_post,
+    ):
+        Sa = np.sin(alpha_angle)
+        Sb = np.sin(beta_angle)
+        Ca = np.cos(alpha_angle)
+        Cb = np.cos(beta_angle)
+        Sa_b = np.sin(alpha_angle - beta_angle)
+        pSaSb = Sa * Sb + 2 * Ca * Cb  # Pitch * sin(a) * sin(b)
+
+        # Compute axial force per elements
+        F_scale = (pSaSb * Sa * Sb * Sa_b**2) / (
+            (Sa * Sb * Sa_b) ** 2 + (Sa**2 - Sb**2) ** 2
+        )
+        force_on_one_element = pressure * np.pi * radius**2 * F_scale / n_elems
+
+        # Compute moment
+        _some_scale_linear_actuation_to_moment = 1.0
+        _some_scale_linear_actuation = 1.0
+
+        # print(f"alpha: {np.rad2deg(alpha_angle.min())}-{np.rad2deg(alpha_angle.max())}, beta: {np.rad2deg(beta_angle.min())}-{np.rad2deg(beta_angle.max())}")
+
+        # Angular actuation
+        ff = 15
+        fi = 15
+        for i in range(skip_element_pre, n_elems - skip_element_post - 1):
+            _gamma_tilt_z = gamma_tilt * min(1.0, (-i + 60) / fi, i / ff)
+            moment_arm = np.array(
+                [
+                    np.cos(z_angle),
+                    np.sin(z_angle),
+                    _gamma_tilt_z,
+                ]
+            )
+            moment_arm /= np.linalg.norm(moment_arm)
+            rod_external_torques[0, i] -= (
+                force_on_one_element[i + 1]
+                * moment_arm[0]
+                * _some_scale_linear_actuation_to_moment
+            )
+            rod_external_torques[1, i] -= (
+                force_on_one_element[i + 1]
+                * moment_arm[1]
+                * _some_scale_linear_actuation_to_moment
+            )
+            rod_external_torques[2, i] -= (
+                force_on_one_element[i + 1]
+                * moment_arm[2]
+                * _some_scale_linear_actuation_to_moment
+            )
+        for i in range(skip_element_pre + 1, n_elems - skip_element_post):
+            _gamma_tilt_z = gamma_tilt * min(1.0, (-i + 60) / fi, i / ff)
+            moment_arm = np.array(
+                [
+                    np.cos(z_angle),
+                    np.sin(z_angle),
+                    _gamma_tilt_z,
+                ]
+            )
+            moment_arm /= np.linalg.norm(moment_arm)
+            rod_external_torques[0, i] += (
+                force_on_one_element[i - 1]
+                * moment_arm[0]
+                * _some_scale_linear_actuation_to_moment
+            )
+            rod_external_torques[1, i] += (
+                force_on_one_element[i - 1]
+                * moment_arm[1]
+                * _some_scale_linear_actuation_to_moment
+            )
+            rod_external_torques[2, i] += (
+                force_on_one_element[i - 1]
+                * moment_arm[2]
+                * _some_scale_linear_actuation_to_moment
+            )
+
+        # Linear Actuation
+        _force_on_one_element = force_on_one_element * _some_scale_linear_actuation
+        rod_external_forces[..., skip_element_pre] -= (
+            _force_on_one_element[skip_element_pre] * tangents[..., skip_element_pre]
+        )
+        rod_external_forces[..., n_elems - skip_element_post] += (
+            _force_on_one_element[n_elems - skip_element_post - 1]
+            * tangents[..., n_elems - skip_element_post - 1]
+        )
+        for i in range(skip_element_pre + 1, n_elems - skip_element_post):
+            rod_external_forces[..., i] += (
+                _force_on_one_element[i - 1] * tangents[..., i - 1]
+            )
+            rod_external_forces[..., i] -= _force_on_one_element[i] * tangents[..., i]
 
 
 class FreeBaseEndSoftFixed(ConstraintBase):
-    def __init__(self, fixed_position, fixed_directors, k, nu, kt, **kwargs):
+    def __init__(
+        self,
+        fixed_position1,
+        fixed_position2,
+        fixed_position3,
+        fixed_position4,
+        fixed_position5,
+        fixed_directors1,
+        fixed_directors2,
+        fixed_directors3,
+        fixed_directors4,
+        fixed_directors5,
+        k,
+        nu,
+        kt,
+        **kwargs,
+    ):
         """
         Parameters
         ----------
@@ -101,18 +196,38 @@ class FreeBaseEndSoftFixed(ConstraintBase):
             3D (dim, dim, 1) array containing data with 'float' type.
         """
         super().__init__(**kwargs)
-        self.fixed_position = fixed_position  # Initial position
-        self.fixed_directors = fixed_directors  # Initial directors
+        self.fixed_position = np.stack(
+            [
+                fixed_position1,
+                fixed_position2,
+                fixed_position3,
+                fixed_position4,
+                fixed_position5,
+            ],
+            axis=-1,
+        )
+        self.fixed_directors = np.stack(
+            [
+                fixed_directors1,
+                fixed_directors2,
+                fixed_directors3,
+                fixed_directors4,
+                fixed_directors5,
+            ],
+            axis=-1,
+        )
         self.k = k
         self.nu = nu
         self.kt = kt
+
+        self.fixing_slice = 5
 
         # Accumulated rotation
         self.rev = 0
 
     def constrain_values(self, system, time):
-        system.position_collection[..., 0] = self.fixed_position
-        system.director_collection[..., 0] = self.fixed_directors
+        system.position_collection[..., : self.fixing_slice] = self.fixed_position
+        system.director_collection[..., : self.fixing_slice] = self.fixed_directors
         return
         self.restrict_position(
             system.position_collection[..., 0],
@@ -132,10 +247,19 @@ class FreeBaseEndSoftFixed(ConstraintBase):
 
     def constrain_rates(self, system, time):
         super().constrain_rates(system, time)
-        system.velocity_collection[..., 0] = 0.0
-        system.omega_collection[..., 0] = 0.0
-        system.acceleration_collection[..., 0] = 0.0
-        system.alpha_collection[..., 0] = 0.0
+        system.velocity_collection[..., : self.fixing_slice] = 0.0
+        system.omega_collection[..., : self.fixing_slice] = 0.0
+        system.acceleration_collection[..., : self.fixing_slice] = 0.0
+        system.alpha_collection[..., : self.fixing_slice] = 0.0
+
+        self.constrain_shear(system.sigma, system.kappa, self.fixing_slice)
+
+    @staticmethod
+    @njit(cache=True)
+    def constrain_shear(sigma, kappa, fixing_slice):
+        pass
+        # sigma[..., :fixing_slice] = 0.0
+        # kappa[..., :fixing_slice] = 0.0
 
     @staticmethod
     @njit(cache=True)
@@ -211,7 +335,7 @@ class FreeCombinedActuation(NoForces):
     Based on B. Joshua 2013
     """
 
-    def __init__(self, actuation_ref, scale, ramp_up_time=0.2):
+    def __init__(self, actuation_ref, scale, ramp_up_time=1.0):
         """
 
         Parameters
@@ -227,22 +351,53 @@ class FreeCombinedActuation(NoForces):
 
         self.direction = np.array([0.0, 0.0, 1.0])  # system always in tangent
 
+        self._counter = 0
+        self._time = []
+        self._force = []
+        self._moment = []
+        fig = plt.figure()
+        self.ax = fig.add_subplot(111)
+        self.pl1 = self.ax.plot(self._force, label="Force")[0]
+        self.pl2 = self.ax.plot(self._moment, label="Moment")[0]
+        plt.legend()
+
     def apply_forces(self, system: "FreeCosseratRod", time):
         factor = min(1.0, time / self.ramp_up_time)
-        self.nb_apply_forces_and_torques(
+        pressure = self.actuation_ref[0] * self.scale * factor
+        a, b = self.nb_apply_forces_and_torques(
             rod_external_forces=system.external_forces,
             rod_external_torques=system.external_torques,
-            pressure=self.actuation_ref[0] * self.scale * factor,
+            pressure=pressure,
             radius=system.radius,
             alpha_angle=system.alpha_angle,
             beta_angle=system.beta_angle,
-            #alpha_angle=system.initial_alpha_angle,
-            #beta_angle=system.initial_beta_angle,
+            # alpha_angle=system.initial_alpha_angle,
+            # beta_angle=system.initial_beta_angle,
             tangents=system.tangents,
             n_elems=system.n_elems,
-            skip_element_pre=2,
-            skip_element_post=2,
+            skip_element_pre=0,
+            skip_element_post=0,
         )
+        if self._counter % 1000 == 0:
+            self._counter = 0
+            # self._time.append(time)
+            # self._force.append(a.max())
+            # self._moment.append(b.max())
+            # self.pl1.set_xdata(self._time)
+            # self.pl1.set_ydata(self._force)
+            # self.pl2.set_xdata(self._time)
+            # self.pl2.set_ydata(self._moment)
+            # self.ax.relim()
+            # self.ax.autoscale_view()
+            # plt.show(block=False)
+            # plt.pause(0.01)
+
+            # print(f"Force: {a.max()}, Torque: {b.max()}")
+            # print(f"delta: {system.delta_turn=}")
+            # print(f"delta: {system.alpha_angle=}")
+            # print(f"delta: {system.beta_angle=}")
+            # print(system.compute_twist())
+        self._counter += 1
 
     @staticmethod
     @njit(cache=True)
@@ -269,13 +424,16 @@ class FreeCombinedActuation(NoForces):
         pSaSb = Sa * Sb + 2 * Ca * Cb  # Pitch * sin(a) * sin(b)
 
         # Compute axial force per elements
-        F_scale = (pSaSb * Sa * Sb * Sa_b**2) / (
-            (Sa * Sb * Sa_b) ** 2 + (Sa**2 - Sb**2) ** 2
+        F_scale = -(
+            # 3e-1
+            1e0
+            * (pSaSb * Sa * Sb * Sa_b**2)
+            / ((Sa * Sb * Sa_b) ** 2 + (Sa**2 - Sb**2) ** 2)
         )
         force_on_one_element = pressure * np.pi * radius**2 * F_scale / n_elems
 
         # Compute moment
-        M_scale = (pSaSb * Sa_b * (Sa**2 - Sb**2)) / (
+        M_scale = -(pSaSb * Sa_b * (Sa**2 - Sb**2)) / (
             (Sa * Sb * Sa_b) ** 2 + (Sa**2 - Sb**2) ** 2
         )
         torque_on_one_element = pressure * np.pi * radius**3 * M_scale / n_elems
@@ -283,19 +441,39 @@ class FreeCombinedActuation(NoForces):
         # print(f"Force: {force_on_one_element.max()}, Torque: {torque_on_one_element.max()}")
         # print(f"alpha: {np.rad2deg(alpha_angle.min())}-{np.rad2deg(alpha_angle.max())}, beta: {np.rad2deg(beta_angle.min())}-{np.rad2deg(beta_angle.max())}")
 
-        for i in range(skip_element_pre, n_elems - skip_element_post):
-            rod_external_forces[..., i] += (
-                force_on_one_element[i] * tangents[..., i]
-            ) * 0.5
-            rod_external_forces[..., i + 1] += (
-                force_on_one_element[i] * tangents[..., i]
-            ) * 0.5
-            rod_external_torques[2, i] += torque_on_one_element[i]
+        # Angular Actuation
+        for i in range(skip_element_pre, n_elems - skip_element_post - 1):
+            rod_external_torques[2, i] -= torque_on_one_element[i + 1]
+        for i in range(skip_element_pre + 1, n_elems - skip_element_post):
+            rod_external_torques[2, i] += torque_on_one_element[i - 1]
 
-        rod_external_forces[..., 0] += 0.5 * force_on_one_element[0] * tangents[..., 0]
-        rod_external_forces[..., -1] += (
-            0.5 * force_on_one_element[-1] * tangents[..., -1]
+        # Linear Actuation
+        rod_external_forces[..., skip_element_pre] -= (
+            force_on_one_element[skip_element_pre] * tangents[..., skip_element_pre]
         )
+        rod_external_forces[..., n_elems - skip_element_post] += (
+            force_on_one_element[n_elems - skip_element_post - 1]
+            * tangents[..., n_elems - skip_element_post - 1]
+        )
+        for i in range(skip_element_pre + 1, n_elems - skip_element_post):
+            rod_external_forces[..., i] += (
+                force_on_one_element[i - 1] * tangents[..., i - 1]
+            )
+            rod_external_forces[..., i] -= force_on_one_element[i] * tangents[..., i]
+
+        # for i in range(skip_element_pre, n_elems - skip_element_post):
+        #     rod_external_forces[..., i] += (
+        #         force_on_one_element[i] * tangents[..., i]
+        #     ) * 0.5
+        #     rod_external_forces[..., i + 1] += (
+        #         force_on_one_element[i] * tangents[..., i]
+        #     ) * 0.5
+
+        # rod_external_forces[..., 0] += 0.5 * force_on_one_element[0] * tangents[..., 0]
+        # rod_external_forces[..., -1] += (
+        #     0.5 * force_on_one_element[-1] * tangents[..., -1]
+        # )
+        return force_on_one_element, torque_on_one_element
 
     def apply_torques(self, system: "FreeCosseratRod", time):
         # Force and torque included together
