@@ -11,6 +11,8 @@ python = ">=3.8,<3.11"
 pyelastica = ">=0.3.1"
 tqdm = "^4.65.0"
 matplotlib = "^3.7.1"
+pydantic = "^2.8.2"
+dmosopt = {git = "https://github.com/iraikov/dmosopt"}
 
 [tool.poetry.group.dev]
 optional = true
