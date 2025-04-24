@@ -604,7 +604,7 @@ def _compute_geometry_from_state(position_collection, volume, lengths, tangents)
         # radius[k] = np.sqrt(volume[k] / lengths[k] / np.pi)
 
 
-@numba.njit(cache=True)  # , error_model='numpy')
+@numba.njit(cache=True) #, error_model='numpy')
 def _compute_all_dilatations(
     position_collection,
     director_collection,
@@ -709,6 +709,10 @@ def _compute_all_dilatations(
         # DEBUG
         # if np.isnan(alpha_angle[k]):
         #     breakpoint()
+
+        # DEBUG
+        #if np.isnan(alpha_angle[k]):
+        #    breakpoint()
 
     # Cmopute eq (3.4) from 2018 RSOS paper
     # Note : we can use trapezoidal kernel, but it has padding and will be slower

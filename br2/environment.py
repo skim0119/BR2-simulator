@@ -20,7 +20,8 @@ from br2.visualize.post_processing import plot_video_with_surface
 from br2.visualize.twist_angle import visual_twist_with_surface
 
 from br2.free_simulator import FreeAssembly
-from br2.custom_callback import BlenderRodCallback
+from br2.callbacks.blender import BlenderRodCallback
+from br2.callbacks.free_callback import OnlinePlottingRodStatus
 
 
 @dataclass
@@ -200,6 +201,7 @@ class Environment:
         rod_database_path: str,
         assembly_config_path: str,
         start_time: float = 0.0,
+        plot_states_online: bool = False,
         verbose: bool = True,
         custom_callback: Callable | None = None,
         **kwargs,
@@ -239,6 +241,12 @@ class Environment:
                 callback_class=BlenderRodCallback,
                 visualize_alpha_beta=self.visualize_alpha_beta,
             )  # [seg,rod]
+        if plot_states_online:
+            self.assy.generate_callbacks(
+                self.step_skip,
+                time_interval=self.capture_interval,
+                callback_class=OnlinePlottingRodStatus,
+            )  # [seg,rod]
 
         custom_callback(self.simulator, self.shearable_rods)
 
@@ -256,6 +264,7 @@ class Environment:
         check_steady_state: Optional[int] = None,
         status_check_interval=1.0,
         pbar: float | None = None,
+        set_pbar_total: float | None = None,
     ) -> TerminalInfo:
         """
         Run simulation for a duration given action.

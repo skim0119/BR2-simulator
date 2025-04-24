@@ -3,13 +3,17 @@ import sys
 
 # sys.settrace
 
+import tempfile
 import numpy as np
+from pydantic_core import from_json
+import json
 import matplotlib.pyplot as plt
 
 np.set_printoptions(precision=4)
 
 from br2.environment import Environment
 from br2.constants import psi2Nm2
+from br2.configurations import RodLibrary
 
 
 def single_free_bend(
@@ -31,7 +35,7 @@ def single_free_bend(
         duration=1.0,
         check_nan=True,
         check_steady_state=True,
-        disable_progress_bar=True,
+        disable_progress_bar=False,
     )
     # print(status)
 
@@ -84,11 +88,89 @@ def single_free_bend(
 
 
 if __name__ == "__main__":
+    if True:
+        # Query data
+        from loader import load_data
 
-    bend, lengths = single_free_bend(
-        40,
-        "rod_library/standard_18.json",
-        "assembly/free_bend_18cm_85_85.json",
-    )
-    for b, l in zip(bend, lengths):
-        print(f"{b} | {l}")
+        actuations, bend_angle, info = load_data(
+            "data/single_free_bend.csv",
+            x_key="Actuation (psi)",
+            y_key="Bend Angle (rad)",
+            keys=["Fiber angles (alpha)", "Fiber angles (beta)", "Length (cm)"],
+        )
+
+        # Setup configuration for simulation
+        assembly_config_path = "assembly/free_bend.json"
+
+        # Set New Configuration
+        original_database_path = "rod_library/standard_18.json"
+        with open(original_database_path, "r") as f:
+            json_data = f.read()
+        rod_library = RodLibrary.model_validate(from_json(json_data))
+
+        # Run
+        act = []
+        exp = []
+        sim = []
+        for actuation, bend_angle_experimental, alpha, beta, length in zip(
+            actuations,
+            bend_angle,
+            info["Fiber angles (alpha)"],
+            info["Fiber angles (beta)"],
+            info["Length (cm)"],
+        ):
+            if length != 18:
+                continue
+            if actuation > 36:
+                continue
+            if actuation < 14:
+                continue
+            rod_library.Rods["RodBend"]["alpha"] = alpha.item()
+            rod_library.Rods["RodBend"]["beta"] = -beta.item()
+
+            # Create new configuration
+            new_json_data = rod_library.model_dump()
+            tfile = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8")
+            rod_database_path = tfile.name
+            json.dump(new_json_data, tfile)
+            tfile.flush()
+
+            # Run simulation
+            bend_angle_simulated, _ = single_free_bend(
+                actuation,
+                rod_database_path,
+                assembly_config_path,
+            )
+            bend_sim = np.nanmax(bend_angle_simulated, initial=0.0)
+
+            act.append(actuation)
+            sim.append(bend_sim)
+            exp.append(bend_angle_experimental)
+
+        # Sort data
+        # label = lambda a, b: f"αβ{a}"
+        # labels = np.array([label(a, b) for a, b in zip(info["Fiber angles (alpha)"][mask], info["Fiber angles (beta)"][mask])])
+        # unique_labels = np.unique(labels)
+
+        # for label in unique_labels:
+        #     mask = np.logical_and(np.logical_and(labels == label, actuations > 10), actuations <= 35)
+        #     plt.scatter(actuations[mask], bend_angle[mask], label=label)
+        for a, e, s in zip(act, exp, sim):
+            plt.plot([a, a], [e, s], alpha=0.8, marker="o", color="black")
+        plt.scatter(act, exp, label="Experimental", color="red")
+        plt.scatter(act, sim, label="Simulated", color="blue")
+        plt.legend()
+        plt.xlabel("Actuation (psi)")
+        plt.ylabel("Bending Angle (rad)")
+        plt.show()
+        plt.savefig("bend_validation.png")
+
+        # Save data in npz
+        np.savez("bend_validation.npz", act=act, exp=exp, sim=sim)
+
+    # bend, lengths = single_free_bend(
+    #     30,
+    #     "rod_library/standard_18.json",
+    #     "assembly/free_bend_18cm_85_85.json",
+    # )
+    # print(bend, lengths)
