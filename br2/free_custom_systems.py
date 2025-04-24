@@ -37,7 +37,7 @@ class FreeBendActuation(NoForces):
 
     def apply_torques(self, system, time=0.0):
         factor = min(1.0, time / self.ramp_up_time)
-        pressure = self.actuation_ref[0] * self.scale * factor
+        pressure = self.actuation_ref() * self.scale * factor
         # torque = pressure * self.local_unit_vector / system.n_elems
         # torque_on_each_element = (
         #    _batch_product_i_k_to_ik(torque, np.ones((system.n_elems)))
@@ -363,7 +363,7 @@ class FreeCombinedActuation(NoForces):
 
     def apply_forces(self, system: "FreeCosseratRod", time):
         factor = min(1.0, time / self.ramp_up_time)
-        pressure = self.actuation_ref[0] * self.scale * factor
+        pressure = self.actuation_ref() * self.scale * factor
         a, b = self.nb_apply_forces_and_torques(
             rod_external_forces=system.external_forces,
             rod_external_torques=system.external_torques,

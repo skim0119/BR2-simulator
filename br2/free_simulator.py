@@ -44,7 +44,7 @@ from br2.modules.block_connections import MemoryBlockConnections
 class BR2Simulator(
     CustomBaseSystemCollection,
     Constraints,
-    # Connections,
+    # Connections,  # Replaced by block connection
     MemoryBlockConnections,
     Forcing,
     Contact,
@@ -59,7 +59,7 @@ class FreeAssembly:
         self.env = env
 
         self.simulator = BR2Simulator()
-        self.actuation = defaultdict(lambda: [0.0])
+        self.actuation = defaultdict(lambda: 0.0)
         self.free = {}  # Key: <segment name>_<order>_<rod name>
 
         # Parameter
@@ -94,8 +94,6 @@ class FreeAssembly:
         rod_info,
         connect_info,
         verbose: bool = True,
-        debug: bool = False,
-        prepend_tag: str = "",
     ):
         """
         if not verbose:
@@ -140,8 +138,6 @@ class FreeAssembly:
                 base_position = seg["base_position"][rod_i]
                 y_rotation = seg["y-rotation"][rod_i]
                 rod_name = "%s_%d_%s" % (seg_name, rod_i, rod_type)
-                if prepend_tag:
-                    rod_name = f"{prepend_tag}_{rod_name}"
 
                 rod_spec = rod_specs[rod_type].copy()
 
@@ -169,19 +165,16 @@ class FreeAssembly:
                 if "beta" in rod_spec:
                     rod_spec["beta_fiber_angle"] = rod_spec["beta"]
 
-                # link activation
-                actuation_name = None
+                # link activations
+                actuation_names = []
                 for _actuation_name, rod_list in activations.items():
                     for data in rod_list:
                         if data[0] == seg_name and data[1] == rod_i:
-                            actuation_name = _actuation_name
-                    if actuation_name is not None:
-                        break
-                if prepend_tag:
-                    actuation_name = f"{prepend_tag}_{actuation_name}"
+                            actuation_names.append(_actuation_name)
 
+                # build PyElastica rod
                 rod = self.add_free(
-                    rod_name, actuation_name, verbose=verbose, **rod_spec
+                    rod_name, actuation_names, verbose=verbose, **rod_spec
                 )
 
                 frees[rod_name] = rod
@@ -259,15 +252,13 @@ class FreeAssembly:
         Set actuation for each rods
         """
         for k, v in actuation.items():
-            self.actuation[k][0] = v
+            self.actuation[k] = v
 
-    def get_actuation_reference(self, actuation_name=None):
-        if actuation_name is not None:
-            actuation_ref = self.actuation[actuation_name]
-            # actuation_ref.append(0.0)  # Remove?
-            return actuation_ref
-        else:
+    def get_actuation_reference(self, actuation_names):
+        if len(actuation_names) == 0:
             return None
+        actuation_ref = lambda: sum([self.actuation[key] for key in tuple(actuation_names)])
+        return actuation_ref
 
     def create_rod(self, name, is_first_segment=True, verbose=False, **rod_spec):
         if rod_spec.get("prebuilt", False):
@@ -364,16 +355,14 @@ class FreeAssembly:
     def add_free(
         self,
         name,
-        actuation_name,
-        alpha: float,
-        beta: float,
+        actuation_names,
         gamma: float | None = None,
         verbose: bool = True,
         **rod_spec,
     ):
         # Create rod
         rod = self.create_rod(name, verbose=verbose, **rod_spec)
-        actuation_ref = self.get_actuation_reference(actuation_name)
+        actuation_ref = self.get_actuation_reference(actuation_names)
 
         # Add fiber
         if actuation_ref is not None:
