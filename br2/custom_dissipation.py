@@ -35,7 +35,7 @@ class AnalyticalLinearDamperV2(DamperBase):
             # * np.diagonal(self._system.inv_mass_second_moment_of_inertia).T
         )
 
-    def dampen_rates(self, rod, time: float):
+    def dampen_rates(self, rod, time):
         nb_dampen_rates(
             rod.velocity_collection,
             rod.omega_collection,
@@ -84,10 +84,10 @@ class LaplaceDissipationFilterV2(DamperBase):
         self.omega_filter_term = np.zeros_like(self._system.omega_collection)
         # self.acceleration_filter_term = np.zeros_like(self._system.acceleration_collection)
         # self.alpha_filter_term = np.zeros_like(self._system.alpha_collection)
-        # self.kappa_filter_term = np.zeros_like(self._system.kappa)
-        # self.sigma_filter_term = np.zeros_like(self._system.sigma)
+        self.kappa_filter_term = np.zeros_like(self._system.kappa)
+        self.sigma_filter_term = np.zeros_like(self._system.sigma)
 
-    def dampen_rates(self, rod, time: float) -> None:
+    def dampen_rates(self, rod, time) -> None:
 
         nb_filter_rate(
             rod.velocity_collection,
@@ -109,16 +109,16 @@ class LaplaceDissipationFilterV2(DamperBase):
         #     self.alpha_filter_term,
         #     self.filter_order,
         # )
-        # nb_filter_rate(
-        #     rod.kappa,
-        #     self.kappa_filter_term,
-        #     self.filter_order,
-        # )
-        # nb_filter_rate(
-        #     rod.sigma,
-        #     self.sigma_filter_term,
-        #     self.filter_order,
-        # )
+        nb_filter_rate(
+            rod.kappa,
+            self.kappa_filter_term,
+            self.filter_order,
+        )
+        nb_filter_rate(
+            rod.sigma,
+            self.sigma_filter_term,
+            self.filter_order,
+        )
 
 
 @njit(cache=True)

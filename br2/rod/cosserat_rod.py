@@ -13,7 +13,7 @@ from elastica._linalg import (
 )
 from elastica._rotations import _inv_rotate
 from elastica.rod.factory_function import allocate
-from elastica.rod.knot_theory import KnotTheory
+from elastica.rod.knot_theory import KnotTheory, _compute_twist
 from elastica._calculus import (
     quadrature_kernel_for_block_structure,
     difference_kernel_for_block_structure,
@@ -180,6 +180,8 @@ class FreeCosseratRod(RodBase, KnotTheory):
         rest_kappa,
         internal_stress,
         internal_couple,
+        alpha_fiber_angle: float,
+        beta_fiber_angle: float,
     ):
         self.n_elems = n_elements
         self.position_collection = position
@@ -216,30 +218,50 @@ class FreeCosseratRod(RodBase, KnotTheory):
 
         self.ring_rod_flag = False
 
+        self.ghost_elems_idx = np.array([], dtype=np.int32)
+        self.ghost_voronoi_idx = np.array([], dtype=np.int32)
+
+        # FREE parameters
+        assert alpha_fiber_angle >= 0.0
+        self.initial_radius = self.radius.copy()
+        self.alpha_angle = np.deg2rad(alpha_fiber_angle) * np.ones(n_elements)
+        self.beta_angle = np.deg2rad(beta_fiber_angle) * np.ones(n_elements)
+        self.initial_alpha_angle = self.alpha_angle.copy()
+        self.initial_beta_angle = self.beta_angle.copy()
+        self.delta_turn = np.zeros(n_elements)
+
+        # G. Krishnan 2015
+        self.alpha_fiber_length = self.lengths * np.tan(self.alpha_angle) / self.radius
+        self.beta_fiber_length = self.lengths * np.tan(self.alpha_angle) / self.radius
+        self.initial_alpha_fiber_length = self.alpha_fiber_length.copy()
+        self.initial_beta_fiber_length = self.beta_fiber_length.copy()
+
         # We add periodic elements at the memory block construction.
         # Compute shear stretch and strains.
-        # _compute_shear_stretch_strains(
-        #    self.position_collection,
-        #    self.volume,
-        #    self.lengths,
-        #    self.tangents,
-        #    self.radius,
-        #    self.rest_lengths,
-        #    self.rest_voronoi_lengths,
-        #    self.dilatation,
-        #    self.voronoi_dilatation,
-        #    self.director_collection,
-        #    self.sigma,
-        #    self.alpha_angle,
-        #    self.beta_angle,
-        #    self.initial_radius,
-        #    self.delta_turn,
-        # )
+        _compute_shear_stretch_strains(
+            self.position_collection,
+            self.volume,
+            self.lengths,
+            self.tangents,
+            self.radius,
+            self.rest_lengths,
+            self.rest_voronoi_lengths,
+            self.dilatation,
+            self.voronoi_dilatation,
+            self.director_collection,
+            self.sigma,
+            self.alpha_angle,
+            self.beta_angle,
+            self.initial_alpha_angle,
+            self.initial_beta_angle,
+            self.initial_radius,
+            self.delta_turn,
+        )
 
         # Compute bending twist strains
-        # _compute_bending_twist_strains(
-        #    self.director_collection, self.rest_voronoi_lengths, self.kappa
-        # )
+        _compute_bending_twist_strains(
+            self.director_collection, self.rest_voronoi_lengths, self.kappa
+        )
 
     @classmethod
     def straight_rod(
@@ -387,22 +409,10 @@ class FreeCosseratRod(RodBase, KnotTheory):
             rest_kappa,
             internal_stress,
             internal_couple,
+            alpha_fiber_angle,
+            beta_fiber_angle,
         )
 
-        # FREE parameters
-        assert alpha_fiber_angle >= 0.0
-        rod.initial_radius = rod.radius.copy()
-        rod.alpha_angle = np.deg2rad(alpha_fiber_angle) * np.ones(n_elements)
-        rod.beta_angle = np.deg2rad(beta_fiber_angle) * np.ones(n_elements)
-        rod.initial_alpha_angle = rod.alpha_angle.copy()
-        rod.initial_beta_angle = rod.beta_angle.copy()
-        rod.delta_turn = np.zeros(n_elements)
-
-        # G. Krishnan 2015
-        rod.alpha_fiber_length = rod.lengths * np.tan(rod.alpha_angle) / rod.radius
-        rod.beta_fiber_length = rod.lengths * np.tan(rod.alpha_angle) / rod.radius
-        rod.initial_alpha_fiber_length = rod.alpha_fiber_length.copy()
-        rod.initial_beta_fiber_length = rod.beta_fiber_length.copy()
         return rod
 
     def compute_internal_forces_and_torques(self, time):
@@ -594,9 +604,10 @@ def _compute_geometry_from_state(position_collection, volume, lengths, tangents)
         # radius[k] = np.sqrt(volume[k] / lengths[k] / np.pi)
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=True)  # , error_model='numpy')
 def _compute_all_dilatations(
     position_collection,
+    director_collection,
     volume,
     lengths,
     tangents,
@@ -615,6 +626,19 @@ def _compute_all_dilatations(
     """
     Update <dilatation and voronoi_dilatation>
     """
+    # _, local_twist = _compute_twist(
+    #    position_collection[None, ...], director_collection[0][None, ...]
+    # )
+    for k in range(lengths.shape[0] - 1):  # start from 1: first element is always 0
+        R_diff = np.dot(
+            director_collection[:, :, k], director_collection[:, :, k + 1].T
+        )
+        trace_value = np.trace(R_diff)
+        angle = np.arccos((trace_value - 1) / 2.0 - 1e-10)
+        delta_turn[k + 1] = angle
+        # delta_turn[k + 1] = 0
+    # print(delta_turn)
+
     _compute_geometry_from_state(position_collection, volume, lengths, tangents)
     # Caveat : Needs already set rest_lengths and rest voronoi domain lengths
     # Put in initialization
@@ -622,46 +646,69 @@ def _compute_all_dilatations(
         dilatation[k] = lengths[k] / rest_lengths[k]
 
         # G. Krishnan 2015 (14)-(15)
-        sgn_beta = np.sign(beta_angle[k])
-        sgn_alpha = np.sign(alpha_angle[k])
-        alpha = alpha_angle[k]
-        beta = beta_angle[k]
-        sqrt_alpha = np.sqrt(
-            (1 + np.cos(alpha) * dilatation[k]) * (1 - np.cos(alpha) * dilatation[k])
-        )
-        sqrt_beta = np.sqrt(
-            (1 + np.cos(beta) * dilatation[k]) * (1 - np.cos(beta) * dilatation[k])
-        )
-        lambda_2 = -(
-            sgn_beta * sqrt_beta * np.cos(alpha) - sgn_alpha * sqrt_alpha * np.cos(beta)
-        ) / np.sin(alpha - beta)
-        #radius[k] = lambda_2 * initial_radius[k]
-        radius[k] = initial_radius[k]
-        delta_turn[k] = (
-            (rest_lengths[k] / initial_radius[k])
-            * (
-                sgn_beta * np.sin(alpha) * sqrt_beta
-                - sgn_alpha * np.sin(beta) * sqrt_alpha
-            )
-            / (
-                sgn_alpha * np.cos(beta) * sqrt_alpha
-                - sgn_beta * np.cos(alpha) * sqrt_beta
-            )
-        )
-        volume[k] = np.pi * lengths[k] * radius[k] ** 2
+        # sgn_beta = np.sign(beta_angle[k])
+        # sgn_alpha = np.sign(alpha_angle[k])
+        # alpha = alpha_angle[k]
+        # beta = beta_angle[k]
+        # sqrt_alpha = np.sqrt(
+        #     max(0.0, (1 + np.cos(alpha) * dilatation[k]))
+        #     * max(0.0, (1 - np.cos(alpha) * dilatation[k]))
+        # )
+        # sqrt_beta = np.sqrt(
+        #     max(0.0, (1 + np.cos(beta) * dilatation[k]))
+        #     * max(0.0, (1 - np.cos(beta) * dilatation[k]))
+        # )
+        # lambda_2 = max(
+        #     -(
+        #         sgn_beta * sqrt_beta * np.cos(alpha)
+        #         - sgn_alpha * sqrt_alpha * np.cos(beta)
+        #     )
+        #     / (np.sin(alpha - beta) + 1e-10),
+        #     0.5,
+        # )
+        lambda_2 = radius[k] / initial_radius[k]
+        # radius[k] = lambda_2 * initial_radius[k]
+        # radius[k] = initial_radius[k]  # Constant radius
+
+        # delta_turn[k] = (
+        #     (rest_lengths[k] / (initial_radius[k] + 1e-10))
+        #     * (
+        #         sgn_beta * np.sin(alpha) * sqrt_beta
+        #         - sgn_alpha * np.sin(beta) * sqrt_alpha
+        #     )
+        #     / (
+        #         (
+        #             sgn_alpha * np.cos(beta) * sqrt_alpha
+        #             - sgn_beta * np.cos(alpha) * sqrt_beta
+        #         )
+        #         + 1e-10
+        #     )
+        # )
+        # volume[k] = np.pi * lengths[k] * radius[k] ** 2
+        # breakpoint()
 
         # G. Krishnan 2015 (22)-(24)
         alpha_angle[k] = np.arctan(
             (lambda_2 / dilatation[k])
-            * (np.tan(initial_alpha_angle[k]) + (initial_radius[k] / rest_lengths[k]) * delta_turn[k])
+            * (
+                np.tan(initial_alpha_angle[k])
+                + (initial_radius[k] / rest_lengths[k]) * delta_turn[k]
+            )
         )
         beta_angle[k] = np.arctan(
             (lambda_2 / dilatation[k])
-            * (np.tan(initial_beta_angle[k]) + (initial_radius[k] / rest_lengths[k]) * delta_turn[k])
+            * (
+                np.tan(initial_beta_angle[k])
+                + (initial_radius[k] / rest_lengths[k]) * delta_turn[k]
+            )
         )
         # Constant fiber length assumption
-        #alpha_angle[k] = sgn_alpha*np.arccos(dilatation[k] * np.cos(initial_alpha_angle[k]))
-        #beta_angle[k] = sgn_beta*np.arccos(dilatation[k] * np.cos(initial_beta_angle[k]))
+        # alpha_angle[k] = sgn_alpha*np.arccos(dilatation[k] * np.cos(initial_alpha_angle[k]))
+        # beta_angle[k] = sgn_beta*np.arccos(dilatation[k] * np.cos(initial_beta_angle[k]))
+
+        # DEBUG
+        # if np.isnan(alpha_angle[k]):
+        #     breakpoint()
 
     # Cmopute eq (3.4) from 2018 RSOS paper
     # Note : we can use trapezoidal kernel, but it has padding and will be slower
@@ -726,6 +773,7 @@ def _compute_shear_stretch_strains(
     # Quick trick : Instead of evaliation Q(et-d^3), use property that Q*d3 = (0,0,1), a constant
     _compute_all_dilatations(
         position_collection,
+        director_collection,
         volume,
         lengths,
         tangents,

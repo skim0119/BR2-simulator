@@ -368,8 +368,8 @@ class _MemoryBlockConnect:
             self._first_sys_idx,
             # second element of the list corresponds to memory block
             self._second_sys_idx,
-            np.array(self.first_sys_connection_idx, dtype=np.int64),
-            np.array(self.second_sys_connection_idx, dtype=np.int64),
+            np.array(self.first_sys_connection_idx, dtype=np.int32),
+            np.array(self.second_sys_connection_idx, dtype=np.int32),
         )
 
     def __call__(self, *args, **kwargs):

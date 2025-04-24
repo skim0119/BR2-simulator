@@ -107,6 +107,7 @@ class MemoryBlockMuscularRod(FreeCosseratRod, _RodSymplecticStepperMixin):
         # since ghosts are not modified, this causes a division by zero error.
         _reset_scalar_ghost(self.mass, self.ghost_nodes_idx, 1.0)
         _reset_scalar_ghost(self.rest_lengths, self.ghost_elems_idx, 1.0)
+        _reset_scalar_ghost(self.initial_radius, self.ghost_elems_idx, 1.0)
         _reset_scalar_ghost(self.rest_voronoi_lengths, self.ghost_voronoi_idx, 1.0)
 
         # Compute strains for the block

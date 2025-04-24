@@ -4,9 +4,11 @@ from numba import njit
 from elastica.joint import FreeJoint
 
 # Join the two rods
+from .rotations import inv_rotate
 from elastica._linalg import (
     _batch_norm,
     _batch_matvec,
+    _batch_matmul,
     _batch_cross,
     _batch_matrix_transpose,
 )
@@ -67,6 +69,31 @@ def get_connection_vector_straight_straight_rod(
     )
 
 
+def get_connection_directors_straight_straight_rod(
+    rod_one,
+    rod_two,
+    rod_one_idx,
+    rod_two_idx,
+):
+    rod_one_start_idx, rod_one_end_idx = rod_one_idx
+    rod_two_start_idx, rod_two_end_idx = rod_two_idx
+
+    # Compute rod element positions
+    rod_one_element_director = rod_one.director_collection[
+        ..., rod_one_start_idx:rod_one_end_idx
+    ]
+    rod_two_element_director = rod_two.director_collection[
+        ..., rod_two_start_idx:rod_two_end_idx
+    ]
+
+    # Offset rotation between rod
+    offset_btw_rods = _batch_matmul(
+        rod_two_element_director, _batch_matrix_transpose(rod_one_element_director)
+    )
+
+    return offset_btw_rods
+
+
 class SurfaceJointSideBySide(FreeJoint):
     """
     TODO: documentation
@@ -77,23 +104,30 @@ class SurfaceJointSideBySide(FreeJoint):
         k,
         nu,
         k_repulsive,
+        k_torsion,
         rod_one_direction_vec_in_material_frame,
         rod_two_direction_vec_in_material_frame,
         offset_btw_rods,
+        offset_rotation_btw_rods=None,
         **kwargs,
     ):
         super().__init__(np.array(k), np.array(nu))
 
         self.k_repulsive = np.array(k_repulsive)
+        self.k_torsion = np.array(k_torsion)
 
-        self.offset_btw_rods = np.array(offset_btw_rods)
+        self.offset_btw_rods = np.array(offset_btw_rods).copy()
+        if offset_rotation_btw_rods is not None:
+            self.offset_rotation_btw_rods = np.array(offset_rotation_btw_rods).T.copy()
+        else:
+            self.offset_rotation_btw_rods = None
 
         self.rod_one_direction_vec_in_material_frame = np.array(
             rod_one_direction_vec_in_material_frame
-        ).T
+        ).T.copy()
         self.rod_two_direction_vec_in_material_frame = np.array(
             rod_two_direction_vec_in_material_frame
-        ).T
+        ).T.copy()
 
     # Apply force is same as free joint
     def apply_forces(self, system_one, index_one, system_two, index_two):
@@ -195,25 +229,28 @@ class SurfaceJointSideBySide(FreeJoint):
         spring_force = k * (distance_vector)
 
         # Damping force
-        # rod_one_element_velocity = 0.5 * (
-        #    rod_one_velocity_collection[:, index_one]
-        #    + rod_one_velocity_collection[:, index_one + 1]
-        # )
-        # rod_two_element_velocity = 0.5 * (
-        #    rod_two_velocity_collection[:, index_two]
-        #    + rod_two_velocity_collection[:, index_two + 1]
-        # )
-        # relative_velocity = rod_two_element_velocity - rod_one_element_velocity
-        # damping_force = nu * relative_velocity
-        for k in range(index_one.shape[0]):
-            v1 = rod_one_velocity_collection[:, index_one[k]]
-            v2 = rod_two_velocity_collection[:, index_two[k]]
-            d = nu[k] * (v1 - v2) / 2.0
-            rod_one_velocity_collection[:, index_one[k]] -= d
-            rod_two_velocity_collection[:, index_two[k]] += d
+        rod_one_element_velocity = 0.5 * (
+            rod_one_velocity_collection[:, index_one]
+            + rod_one_velocity_collection[:, index_one + 1]
+        )
+        rod_two_element_velocity = 0.5 * (
+            rod_two_velocity_collection[:, index_two]
+            + rod_two_velocity_collection[:, index_two + 1]
+        )
+        relative_velocity = rod_two_element_velocity - rod_one_element_velocity
+        damping_force = nu * relative_velocity
+
+        # Damping velocity directly (experimental)
+        # for k in range(index_one.shape[0]):
+        #    v1 = rod_one_velocity_collection[:, index_one[k]]
+        #    v2 = rod_two_velocity_collection[:, index_two[k]]
+        #    # d = nu[k] * (v1 - v2) / 2.0
+        #    d = nu * (v1 - v2) / 2.0
+        #    rod_one_velocity_collection[:, index_one[k]] -= d
+        #    rod_two_velocity_collection[:, index_two[k]] += d
 
         # Compute the total force
-        total_force = spring_force  # + damping_force
+        total_force = spring_force + damping_force
 
         # Compute contact forces. Contact forces are applied in the case one rod penetrates to the other, in that case
         # we apply a repulsive force.
@@ -263,7 +300,6 @@ class SurfaceJointSideBySide(FreeJoint):
         )
 
     def apply_torques(self, system_one, index_one, system_two, index_two):
-        # pass
 
         self._apply_torques(
             self.spring_force,
@@ -275,6 +311,8 @@ class SurfaceJointSideBySide(FreeJoint):
             system_two.director_collection,
             system_one.external_torques,
             system_two.external_torques,
+            self.k_torsion,
+            self.offset_rotation_btw_rods,
         )
 
     @staticmethod
@@ -289,36 +327,60 @@ class SurfaceJointSideBySide(FreeJoint):
         rod_two_director_collection,
         rod_one_external_torques,
         rod_two_external_torques,
+        k_torsion,
+        initial_offset_rotation_btw_rods,
     ):
+        rod_one_director = rod_one_director_collection[..., index_one]
+        rod_two_director = rod_two_director_collection[..., index_two]
+
         # Compute torques due to the connection forces
         torque_on_rod_one = _batch_cross(rod_one_rd2, spring_force)
         torque_on_rod_two = _batch_cross(rod_two_rd2, -spring_force)
 
         torque_on_rod_one_material_frame = _batch_matvec(
-            rod_one_director_collection[:, :, index_one], torque_on_rod_one
+            rod_one_director, torque_on_rod_one
         )
         torque_on_rod_two_material_frame = _batch_matvec(
-            rod_two_director_collection[:, :, index_two], torque_on_rod_two
+            rod_two_director, torque_on_rod_two
         )
+
+        # Offset Torsion
+        current_offset_btw_rods = _batch_matmul(
+            rod_two_director, _batch_matrix_transpose(rod_one_director)
+        )
+
+        dev_rot = _batch_matmul(
+            _batch_matrix_transpose(initial_offset_rotation_btw_rods),
+            current_offset_btw_rods,
+        )
+        rot_vec = inv_rotate(dev_rot)
+        rot_vec_inertial_frame = _batch_matvec(
+            _batch_matrix_transpose(rod_two_director), rot_vec
+        )
+        offset_torque = k_torsion * rot_vec_inertial_frame
+        offset_torque_on_rod_one = _batch_matvec(rod_one_director, -offset_torque)
+        offset_torque_on_rod_two = _batch_matvec(rod_two_director, offset_torque)
+
+        # TODO: Offset Torsion Damping
 
         blocksize = index_one.shape[0]
         for k in range(blocksize):
-            rod_one_external_torques[
-                0, index_one[k]
-            ] += torque_on_rod_one_material_frame[0, k]
-            rod_one_external_torques[
-                1, index_one[k]
-            ] += torque_on_rod_one_material_frame[1, k]
-            rod_one_external_torques[
-                2, index_one[k]
-            ] += torque_on_rod_one_material_frame[2, k]
+            rod_one_external_torques[0, index_one[k]] += (
+                torque_on_rod_one_material_frame[0, k] + offset_torque_on_rod_one[0, k]
+            )
+            rod_one_external_torques[1, index_one[k]] += (
+                torque_on_rod_one_material_frame[1, k] + offset_torque_on_rod_one[1, k]
+            )
+            rod_one_external_torques[2, index_one[k]] += (
+                torque_on_rod_one_material_frame[2, k] + offset_torque_on_rod_one[2, k]
+            )
 
-            rod_two_external_torques[
-                0, index_two[k]
-            ] += torque_on_rod_two_material_frame[0, k]
-            rod_two_external_torques[
-                1, index_two[k]
-            ] += torque_on_rod_two_material_frame[1, k]
-            rod_two_external_torques[
-                2, index_two[k]
-            ] += torque_on_rod_two_material_frame[2, k]
+            rod_two_external_torques[0, index_two[k]] += (
+                torque_on_rod_two_material_frame[0, k] + offset_torque_on_rod_two[0, k]
+            )
+            rod_two_external_torques[1, index_two[k]] += (
+                torque_on_rod_two_material_frame[1, k] + offset_torque_on_rod_two[1, k]
+            )
+            rod_two_external_torques[2, index_two[k]] += (
+                torque_on_rod_two_material_frame[2, k] + offset_torque_on_rod_two[2, k]
+            )
