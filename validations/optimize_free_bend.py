@@ -20,7 +20,6 @@ tag = "bend_validation"
 
 
 def objective(moment_scale):
-
     # Load experimental data
     actuations, bend_angle, info = load_data(
         "data/single_free_bend.csv",
@@ -60,13 +59,16 @@ def objective(moment_scale):
         json.dump(new_json_data, tfile)
         tfile.flush()
 
-        bend_angle_simulated, _ = single_free_bend(
+        bend_angle_simulated, lengths = single_free_bend(
             actuation,
             rod_database_path,
             assembly_config_path,
             tag,
         )
-        loss += np.abs(bend_angle_simulated - bend_angle_experimental)
+        max_bend_angle = np.nanmax(bend_angle_simulated, initial=0.)
+        loss += np.abs(max_bend_angle - bend_angle_experimental)
+        if np.nanmax(lengths, initial=0.) > lengths[0] * 1.2:
+            loss += 100
 
     tfile.close()
 
@@ -81,15 +83,9 @@ def obj_fun(pp):
 
 
 if __name__ == "__main__":
-    # actuations, twists = load_data("data/single_free_twist.csv")
-    # plt.plot(actuations, twists, 'o', label='experimental data')
-    # plt.xlabel('Actuation')
-    # plt.ylabel('Twist')
-    # plt.show()
-    # sys.exit()
     h5_path = os.path.join(f"result_{tag}", "dmosopt_results.h5")
     opt_id = "optimize_free_bend"
-    space = {"moment_scale": [1e-4, 1e-1]}
+    space = {"moment_scale": [1.0e-4, 1.0e0]}
     objective_names = ["loss"]
 
     # Create an optimizer
@@ -100,24 +96,25 @@ if __name__ == "__main__":
         "problem_parameters": {},
         "space": space,
         "objective_names": objective_names,
-        "population_size": 200,
+        "population_size": 100,
         "num_generations": 200,
         "initial_maxiter": 10,
         "optimizer_name": "nsga2",
         "termination_conditions": True,
         "n_initial": 5,
-        "n_epochs": 10,
+        "n_epochs": 15,
         "file_path": h5_path,
         "save": True,
         "save_surrogate_evals": True,
         "save_optimizer_params": True,
     }
 
-    best = dmosopt.run(dmosopt_params, verbose=True)
-
     from fdmosopt import Dmosopt
-
     dmosopt = Dmosopt(dmosopt_config=dmosopt_params)
+    dmosopt()
+
+    #dmosopt.run(dmosopt_params, verbose=True)
+
     best = dmosopt.get_best()
     bestx = best["x"]
     # besty = best["y"]
@@ -126,6 +123,8 @@ if __name__ == "__main__":
     results = dmosopt.load_h5(opt_id=opt_id)
     x = results["parameters"].values
     y = results["objectives"]["loss"].values
+    print(x)
+    print(y)
 
     # plot results
     plt.scatter(x[:, 0], y)

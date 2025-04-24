@@ -17,21 +17,25 @@ def main():
     psi2Nm2 = 6895
 
     # Actuation Profile
-    action = {"action1": 60 * psi2Nm2, "action2": 10 * psi2Nm2}
+    action = {"action1": 10 * psi2Nm2, "action2": 10 * psi2Nm2}
 
     # Prepare environment
-    env = Environment(time_step = 1.e-4, run_tag=tag, rendering_fps=60, export_blender=True) #, capture_interval=(0.5,0.8))
+    env = Environment(
+        time_step=1.0e-4, run_tag=tag, rendering_fps=60, export_blender=True
+    )  # , capture_interval=(0.5,0.8))
     env.reset(
         rod_database_path="database/rod_library.json",
         assembly_config_path="assembly/double_br2.json",
-        gravity=True,
-        k_multiplier=1e0,
-        k_repulsive=1e3,  # Default 2
+        gravity=False,
+        k_multiplier=1.5e0,
+        k_repulsive=1e2,  # Default 2
         nu_multiplier=0.0000,  # Default 0
     )
 
     # Simulation
-    status = env.run(action=action, duration=10.0, check_nan=True, check_steady_state=True)
+    status = env.run(
+        action=action, duration=5.0, check_nan=True, check_steady_state=False
+    )
     print(status)
 
     # Post Processing
@@ -45,9 +49,8 @@ def main():
         vis2D=True,  # Turn on projected (2D) visualization
         vis3D_director=False,
         vis2D_director_lastelement=False,
-
-        visualize_twist_angle = False,
-        max_fps=30
+        visualize_twist_angle=False,
+        max_fps=30,
     )
     env.debug_data()
     env.save_data()

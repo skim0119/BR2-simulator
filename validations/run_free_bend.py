@@ -28,7 +28,7 @@ def single_free_bend(
     # Simulation
     status = env.run(
         action=action,
-        duration=5.0,
+        duration=1.0,
         check_nan=True,
         check_steady_state=True,
         disable_progress_bar=True,
@@ -48,7 +48,7 @@ def single_free_bend(
             1,
         )
     ).sum(axis=1)
-    bend = angles / (2 * np.pi)
+    bend = angles
     lengths = np.linalg.norm(tangents, axis=1).sum(axis=1)
 
     # Post Processing
@@ -84,8 +84,11 @@ def single_free_bend(
 
 
 if __name__ == "__main__":
+
     bend, lengths = single_free_bend(
-        30,
+        40,
         "rod_library/standard_18.json",
         "assembly/free_bend_18cm_85_85.json",
     )
+    for b, l in zip(bend, lengths):
+        print(f"{b} | {l}")

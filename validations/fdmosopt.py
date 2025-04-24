@@ -39,7 +39,12 @@ sys.excepthook = mpi_excepthook
 
 
 class DmosoptConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    #model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict()
+
+    obj_fun: Callable | None = None
+    controller: Callable | Any | None = None
+    reduce_fun: Callable | None = None
 
     # Basic configuration
     opt_id: str
@@ -66,7 +71,6 @@ class DmosoptConfig(BaseModel):
     ] = "glp"
     dynamic_initial_sampling: str | None = None
     dynamic_initial_sampling_kwargs: dict[str, Any] = {}
-    verbose: bool = False
     problem_ids: Set | None = None
     problem_parameters: Optional[Dict]
     space: dict[str, tuple[int, int] | tuple[float, float]] = {}
@@ -224,7 +228,7 @@ class Dmosopt(BaseModel):
             spawn_args=self.run_config.spawn_args,
             nprocs_per_worker=self.run_config.nprocs_per_worker,
             collective_mode=self.run_config.collective_mode,
-            verbose=self.run_config.verbose,
+            #verbose=self.run_config.verbose,
             worker_debug=self.run_config.worker_debug,
         )
 
@@ -387,7 +391,7 @@ class Dmosopt(BaseModel):
 
                     epoch += 1
 
-                items = [stat.item() for stat in stats]
+                items = [np.array(stat.item()) for stat in stats]
                 stats = pd.DataFrame(
                     items, columns=epoch_stats.dtype.names
                 )
