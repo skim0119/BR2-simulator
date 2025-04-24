@@ -63,7 +63,7 @@ class BlenderRodCallback(CallBackBaseClass):
     """
 
     def __init__(
-        self, step_skip: int, time_interval: int, callback_params=None, visualize_alpha_beta=True, **kwargs
+        self, step_skip: int, time_interval: int, callback_params=None, visualize_alpha_beta=True, is_ring=False, **kwargs
     ) -> None:
         CallBackBaseClass.__init__(self, **kwargs)
         self.every = step_skip
@@ -77,6 +77,7 @@ class BlenderRodCallback(CallBackBaseClass):
         self.num_splines = 1
 
         self.visualize_alpha_beta = visualize_alpha_beta
+        self.is_ring=is_ring
 
     def make_callback(
         self, system: RodType, time: np.floating, current_step: int
@@ -93,7 +94,7 @@ class BlenderRodCallback(CallBackBaseClass):
         if np.isnan(system.position_collection).any() or np.isnan(system.radius).any():
             self.stop = True
             return
-        if np.isnan(system.alpha_angle).any() or np.isnan(system.beta_angle).any():
+        if self.visualize_alpha_beta and (np.isnan(system.alpha_angle).any() or np.isnan(system.beta_angle).any()):
             self.stop = True
             return
 
@@ -114,7 +115,7 @@ class BlenderRodCallback(CallBackBaseClass):
         tangent,
         fiber_angle,
         helix_radius_ratio=1.0 / 20,
-        num_spline_resolution=16,
+        num_spline_resolution=32,
     ):
         radii = np.repeat(initial_radius * helix_radius_ratio, num_spline_resolution)
 
@@ -150,8 +151,11 @@ class BlenderRodCallback(CallBackBaseClass):
         return points, radii
 
     def initialize(self, system) -> None:
+        positions = system.position_collection
+        if self.is_ring:
+            positions = np.append(positions, positions[..., :1], axis=1)
         self.bsr_rod = Rod(
-            positions=system.position_collection,
+            positions=positions,
             radii=system.radius,
             # system.director_collection,
         )
@@ -165,7 +169,7 @@ class BlenderRodCallback(CallBackBaseClass):
         # Add alpha angle
         for i in range(self.num_splines):
             positions, radii = self.find_helix(
-                system.position_collection,
+                positions,
                 system.lengths,
                 system.radius,
                 system.initial_radius,
@@ -180,7 +184,7 @@ class BlenderRodCallback(CallBackBaseClass):
         # Add beta angle
         for i in range(self.num_splines):
             positions, radii = self.find_helix(
-                system.position_collection,
+                positions,
                 system.lengths,
                 system.radius,
                 system.initial_radius,
@@ -193,8 +197,11 @@ class BlenderRodCallback(CallBackBaseClass):
             )
 
     def update_states(self, system) -> None:
+        positions = system.position_collection
+        if self.is_ring:
+            positions = np.append(positions, positions[..., :1], axis=1)
         self.bsr_rod.update_states(
-            positions=system.position_collection,
+            positions=positions,
             radii=system.radius,
             # directors=system.director_collection,
         )
@@ -205,7 +212,7 @@ class BlenderRodCallback(CallBackBaseClass):
         # Add alpha angle
         for i in range(self.num_splines):
             positions, radii = self.find_helix(
-                system.position_collection,
+                positions,
                 system.lengths,
                 system.radius,
                 system.initial_radius,
@@ -218,7 +225,7 @@ class BlenderRodCallback(CallBackBaseClass):
         # Add beta angle
         for i in range(self.num_splines):
             positions, radii = self.find_helix(
-                system.position_collection,
+                positions,
                 system.lengths,
                 system.radius,
                 system.initial_radius,

@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional, Union, Callable
 
 import os
 import copy
@@ -6,11 +6,13 @@ import time
 import logging
 
 from dataclasses import dataclass
+from itertools import chain
 
 from tqdm import tqdm
 
 import numpy as np
 
+import elastica
 from elastica import *
 from elastica._calculus import _isnan_check
 
@@ -199,6 +201,7 @@ class Environment:
         assembly_config_path: str,
         start_time: float = 0.0,
         verbose: bool = True,
+        custom_callback: Callable | None = None,
         **kwargs,
     ) -> None:
         """
@@ -237,6 +240,8 @@ class Environment:
                 visualize_alpha_beta=self.visualize_alpha_beta,
             )  # [seg,rod]
 
+        custom_callback(self.simulator, self.shearable_rods)
+
         # Finalize simulation environment. After finalize, you cannot add
         # any forcing, constrain or call back functions
         self.simulator.finalize()
@@ -249,6 +254,8 @@ class Environment:
         disable_progress_bar: bool = False,
         check_nan: bool = False,
         check_steady_state: Optional[int] = None,
+        status_check_interval=1.0,
+        pbar: float | None = None,
     ) -> TerminalInfo:
         """
         Run simulation for a duration given action.
@@ -288,19 +295,37 @@ class Environment:
         time = self.time
         if not duration:
             duration = self.time_step
-        with tqdm(
-            total=self.time + duration,
-            mininterval=0.5,
-            disable=disable_progress_bar,
-            bar_format="{desc}: {percentage:.3f}%|{bar}| {n:.5f}/{total_fmt} [{elapsed}<{remaining}",
-        ) as pbar:
-            while time < self.time + duration:
-                time = self.StatefulStepper.step(
-                    self.simulator,
-                    time,
-                    self.time_step,
-                )
-                pbar.update(self.time_step)
+        next_status_check_time = time + status_check_interval
+        if pbar is None:
+            _pbar = tqdm(
+                total=time + duration,
+                mininterval=1.0,
+                disable=disable_progress_bar,
+                bar_format="{desc}: {percentage:.3f}%|{bar}| {n:.5f}/{total_fmt} [{elapsed}<{remaining}",
+            )
+        else:
+            _pbar = pbar
+        while time < self.time + duration:
+            time = self.StatefulStepper.step(
+                self.simulator,
+                time,
+                self.time_step,
+            )
+            _pbar.update(self.time_step)
+            # Check NaN
+            if check_nan and time >= next_status_check_time:
+                # fmt: off
+                # Position of the rod cannot be NaN, it is not valid, stop the simulation
+                status.position_nan_status = any([_isnan_check(self.shearable_rods[name].position_collection) for name in self.shearable_rods.keys()] )
+                status.velocity_nan_status = any([_isnan_check(self.shearable_rods[name].velocity_collection) for name in self.shearable_rods.keys()])
+                status.director_nan_status = any([_isnan_check(self.shearable_rods[name].director_collection) for name in self.shearable_rods.keys()])
+                status.omega_nan_status = any([_isnan_check(self.shearable_rods[name].omega_collection) for name in self.shearable_rods.keys()])
+                next_status_check_time += status_check_interval
+                if status.combined_nan_status:
+                    break
+                # fmt: on
+        if pbar is None:
+            _pbar.close()
         self.time = time
 
         # Check steady state
@@ -353,16 +378,6 @@ class Environment:
             director_steady_state_status = (director_delta < self.director_threshold)
             omega_steady_state_status = (omega_delta < self.omega_threshold)
             alpha_steady_state_status = (alpha_delta < self.alpha_threshold)
-            # fmt: on
-
-        # Check NaN
-        if check_nan:
-            # fmt: off
-            # Position of the rod cannot be NaN, it is not valid, stop the simulation
-            status.position_nan_status = any([_isnan_check(self.shearable_rods[name].position_collection) for name in self.shearable_rods.keys()] )
-            status.velocity_nan_status = any([_isnan_check(self.shearable_rods[name].velocity_collection) for name in self.shearable_rods.keys()])
-            status.director_nan_status = any([_isnan_check(self.shearable_rods[name].director_collection) for name in self.shearable_rods.keys()])
-            status.omega_nan_status = any([_isnan_check(self.shearable_rods[name].omega_collection) for name in self.shearable_rods.keys()])
             # fmt: on
 
         status.end_status = True
@@ -450,6 +465,14 @@ class Environment:
 
         self.save_data("position")
 
+    def save_rod_data(self) -> None:
+        filename = "{}.npz"
+        path = os.path.join(self.paths.data, filename)
+
+        for key, data in self.data_rods.items():
+            _data = {k: np.array(v) for k, v in data.items()}
+            np.savez(path.format(key), **_data)
+
     def save_data(self, tag: Optional[str] = None) -> None:
         """save_data.
 
@@ -463,24 +486,26 @@ class Environment:
         else:
             filename = f"br2_data_{tag}.npz"
         path = os.path.join(self.paths.data, filename)
-        time = np.array(self.data_rods[0]["time"])
 
         positions = []
-        for rod in self.data_rods:
+        for key in self.data_rods:
+            rod = self.data_rods[key]
+            time = np.array(rod["time"])
             position = np.array(rod["position"])
             position = 0.5 * (position[..., 1:] + position[..., :-1])
             positions.append(position)
         positions = np.asarray(positions)
 
         directors = []
-        for rod in self.data_rods:
+        for key in self.data_rods:
+            rod = self.data_rods[key]
             director = np.array(rod["director"])
             directors.append(director)
         directors = np.asarray(directors)
 
         np.savez(
             path,
-            time=np.array(self.data_rods[0]["time"]),
+            time=time,
             positions=positions,
             directors=directors,
         )
@@ -531,9 +556,15 @@ class Environment:
             )
             kappa, kappa_median, kappa_isnan = find_max_val(np.array(data_rod["kappa"]))
             sigma, sigma_median, sigma_isnan = find_max_val(np.array(data_rod["sigma"]))
-            alpha_angle, alpha_angle_median, alpha_angle_isnan = find_max_val(np.array(data_rod["alpha_angle"]))
-            beta_angle, beta_angle_median, beta_angle_isnan = find_max_val(np.array(data_rod["beta_angle"]))
-            delta_turn, delta_turn_median, delta_turn_isnan = find_max_val(np.array(data_rod["delta_turn"]))
+            alpha_angle, alpha_angle_median, alpha_angle_isnan = find_max_val(
+                np.array(data_rod["alpha_angle"])
+            )
+            beta_angle, beta_angle_median, beta_angle_isnan = find_max_val(
+                np.array(data_rod["beta_angle"])
+            )
+            delta_turn, delta_turn_median, delta_turn_isnan = find_max_val(
+                np.array(data_rod["delta_turn"])
+            )
             df = pd.DataFrame(
                 {
                     "time": time,
@@ -602,3 +633,221 @@ class Environment:
 
             bsr.frame_manager.frame_end
             bsr.save(blender_path)
+
+
+class BatchEnvironment:
+    """
+
+    Attributes
+    ----------
+    rendering_fps : int
+        Rendering fps for output videos. (default=25)
+    time_step : float
+        Simulation timestep. Faster time-step could reduce the simulation walltime,
+        but the simulation may be unstable. (default=2.0e-5)
+    capture_interval : Optional[tuple[float, float]]
+        Interval for capturing the data. (default=None)
+        ex. (0.3, 0.5)
+    """
+
+    def __init__(
+        self,
+        run_tag: str,
+        rendering_fps: int = 25,
+        time_step: float = 2.0e-5,
+        capture_interval: Optional[tuple[float, float]] = None,
+        **kwargs,
+    ):
+        # Initialize FreeAssembly
+        self.assy = FreeAssembly(self, **kwargs)
+        self.simulator = self.assy.simulator
+
+        # Integrator type (pyelastica==0.2.2 only provide PositionVerlet)
+        self.StatefulStepper = elastica.PositionVerlet()
+
+        # Set paths
+        self.paths = DataPaths(run_tag)
+        self.paths.initialize()
+
+        # Simulation parameters
+        self.time_step = time_step
+
+        # Recording speed
+        self.step_skip = max(1, int(1.0 / (rendering_fps * self.time_step)))
+        self.rendering_fps = rendering_fps
+        self.capture_interval = capture_interval
+
+        # Rod
+        self.shearable_rods = []
+        self.data_rods = {}
+
+    def build(
+        self,
+        action,
+        rod_database_path: str,
+        assembly_config_path: str,
+        verbose: bool = True,
+        prepend_tag: str = "",
+        **kwargs,
+    ) -> None:
+        """
+        Creates the simulation environment.
+
+        Parameters
+        ----------
+        rod_database_path : str
+        assembly_config_path : str
+        """
+
+        assert os.path.exists(rod_database_path), "Rod database path does not exists."
+        assert os.path.exists(
+            assembly_config_path
+        ), "Assembly configuration does not exists."
+
+        # Set action
+        if prepend_tag:
+            action_name = {
+                f"{prepend_tag}_{key}": value for key, value in action.items()
+            }
+        self.assy.set_actuation(action_name)
+
+        # rod name -> [seg,rod]
+        self.shearable_rods.append(
+            self.assy.build(
+                rod_database_path,
+                assembly_config_path,
+                verbose=verbose,
+                prepend_tag=prepend_tag,
+            )
+        )
+
+    def run(
+        self,
+        duration: Optional[float] = None,
+        disable_progress_bar: bool = False,
+    ) -> TerminalInfo:
+        """
+        Run simulation for a duration.
+
+        Parameters
+        ----------
+        duration : Optional[float]
+            If duration is not specified, run a single step (duration=step_size)
+        disable_progress_bar : bool
+        """
+        # Collect data using callback function for postprocessing
+        # set the diagnostics for rod and collect data
+        self.data_rods = self.assy.generate_callbacks(
+            self.step_skip, time_interval=self.capture_interval
+        )  # [seg,rod]
+
+        # Finalize simulation environment. After finalize, you cannot add
+        # any forcing, constrain or call back functions
+        self.simulator.finalize()
+        self.time = 0.0  # simulation time
+
+        # Initialize status
+        status = TerminalInfo()
+
+        # Simulation
+        time = self.time
+        if not duration:
+            duration = self.time_step
+        with tqdm(
+            total=self.time + duration,
+            mininterval=0.5,
+            disable=disable_progress_bar,
+            bar_format="{desc}: {percentage:.3f}%|{bar}| {n:.5f}/{total_fmt} [{elapsed}<{remaining}",
+        ) as pbar:
+            while time < self.time + duration:
+                time = self.StatefulStepper.step(
+                    self.simulator,
+                    time,
+                    self.time_step,
+                )
+                pbar.update(self.time_step)
+        self.time = time
+
+        # Check steady state
+        status.end_status = True
+        return status
+
+    def save_state(
+        self, directory: Optional[str] = None, verbose: bool = False
+    ) -> None:
+        """
+        Save state parameters of each rod.
+
+        Parameters
+        ----------
+        directory: Optional[str]
+            Directory path name. The path must exist.
+        """
+        pass
+
+    def load_state(
+        self, directory: str = "", clear_callback: bool = False, verbose: bool = False
+    ) -> None:
+        """
+        Load the rod-state.
+        Compatibale with 'save_state' method.
+
+        If the save-file does not exist, it returns error.
+
+        Parameters
+        ----------
+        directory : Optional[str]
+            Directory path name.
+        """
+        pass
+
+    def render_video(
+        self,
+        max_fps: bool = None,
+        **kwargs,
+    ) -> None:
+        """
+        Make video 3D rod movement in time.
+        """
+        if max_fps is not None and max_fps < self.rendering_fps:
+            _rendering_fps = max_fps
+        else:
+            _rendering_fps = self.rendering_fps
+
+        filename_video = "br2_simulation"
+        save_folder = self.paths.renderings
+        if not os.path.exists(save_folder):
+            os.makedirs(save_folder)
+        else:
+            logging.warning("The folder already exists. The data will be overwritten.")
+
+        flattened_data = []
+        for data in self.data_rods:
+            flattened_data.extend(list(data.values()))
+        plot_video_with_surface(
+            flattened_data,
+            video_name=filename_video,
+            fps=_rendering_fps,
+            step=1,
+            save_folder=save_folder,
+            **kwargs,
+        )
+
+    def save_data(self, tag: Optional[str] = None) -> None:
+        """save_data.
+
+        Parameters
+        ----------
+        tag : Optional[str]
+            String tag that appends to the file name.
+        """
+        pass
+
+    def debug_data(self):
+        pass
+
+    def close(self):
+        """
+        Close the simulator.
+        """
+        pass
