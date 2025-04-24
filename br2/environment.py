@@ -20,8 +20,8 @@ from br2.visualize.post_processing import plot_video_with_surface
 from br2.visualize.twist_angle import visual_twist_with_surface
 
 from br2.free_simulator import FreeAssembly
-from br2.callbacks.blender import BlenderRodCallback
-from br2.callbacks.free_callback import OnlinePlottingRodStatus
+from br2.callbacks import BlenderRodCallback
+from br2.callbacks import OnlinePlottingRodStatus
 
 
 @dataclass

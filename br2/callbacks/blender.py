@@ -25,6 +25,7 @@ class BlenderRodCallback(CallBackBaseClass):
         callback_params=None,
         scale: float = 100.0,
         visualize_alpha_beta=True,
+        is_ring=False,
         **kwargs
     ) -> None:
         CallBackBaseClass.__init__(self, **kwargs)
@@ -40,6 +41,7 @@ class BlenderRodCallback(CallBackBaseClass):
         self.num_splines = 1
 
         self.visualize_alpha_beta = visualize_alpha_beta
+        self.is_ring=is_ring
 
     def make_callback(
         self, system: RodType, time: np.floating, current_step: int
@@ -113,9 +115,12 @@ class BlenderRodCallback(CallBackBaseClass):
         return points, radii
 
     def initialize(self, system) -> None:
+        positions = system.position_collection
+        if self.is_ring:
+            positions = np.append(positions, positions[..., :1], axis=1)
         self.bsr_rod = Rod(
-            system.position_collection * self.scale,
-            system.radius * self.scale,
+            positions=positions * self.scale,
+            radii=system.radius * self.scale,
             # system.director_collection,
         )
 
@@ -160,8 +165,11 @@ class BlenderRodCallback(CallBackBaseClass):
             )
 
     def update_states(self, system) -> None:
+        positions = system.position_collection
+        if self.is_ring:
+            positions = np.append(positions, positions[..., :1], axis=1)
         self.bsr_rod.update_states(
-            positions=system.position_collection * self.scale,
+            positions=positions * self.scale,
             radii=system.radius * self.scale,
             # directors=system.director_collection,
         )

@@ -46,7 +46,13 @@ def objective(moment_scale):
         info["Fiber angles (beta)"],
         info["Length (cm)"],
     ):
+        #if alpha <= 70:
+        #    continue
         if length != 18:
+            continue
+        if actuation < 14:
+            continue
+        if actuation > 36:
             continue
         rod_library.Rods["RodBend"]["alpha"] = alpha.item()
         rod_library.Rods["RodBend"]["beta"] = -beta.item()

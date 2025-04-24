@@ -33,7 +33,7 @@ from br2.free_custom_systems import (
     FreeBaseEndSoftFixed,
     FreeCombinedActuation,
 )
-from br2.custom_callback import FreeCallback
+from br2.callbacks import FreeCallback
 from br2.custom_dissipation import AnalyticalLinearDamperV2, LaplaceDissipationFilterV2
 from br2.modules.base_system import BaseSystemCollection as CustomBaseSystemCollection
 from br2.modules.base_system import BaseSystemCollection as CustomBaseSystemCollection
