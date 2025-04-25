@@ -41,7 +41,7 @@ class BlenderRodCallback(CallBackBaseClass):
         self.num_splines = 1
 
         self.visualize_alpha_beta = visualize_alpha_beta
-        self.is_ring=is_ring
+        self.is_ring = is_ring
 
     def make_callback(
         self, system: RodType, time: np.floating, current_step: int
@@ -58,7 +58,9 @@ class BlenderRodCallback(CallBackBaseClass):
         if np.isnan(system.position_collection).any() or np.isnan(system.radius).any():
             self.stop = True
             return
-        if np.isnan(system.alpha_angle).any() or np.isnan(system.beta_angle).any():
+        if hasattr(system, "alpha_angle") and (
+            np.isnan(system.alpha_angle).any() or np.isnan(system.beta_angle).any()
+        ):
             self.stop = True
             return
 

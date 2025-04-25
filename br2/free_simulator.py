@@ -55,7 +55,7 @@ class BR2Simulator(
 
 
 class FreeAssembly:
-    def __init__(self, env, gravity=False, REMOVE_CONNECTION:bool=False, **kwargs):
+    def __init__(self, env, REMOVE_CONNECTION: bool = False, **kwargs):
         self.env = env
 
         self.simulator = BR2Simulator()
@@ -63,7 +63,6 @@ class FreeAssembly:
         self.free = {}  # Key: <segment name>_<order>_<rod name>
 
         # Parameter
-        self.toggle_gravity: bool = gravity
         self.num_activation: int = 0
         self.num_segment: int = 0
 
@@ -71,7 +70,9 @@ class FreeAssembly:
         self.k_multiplier = kwargs.get("k_multiplier", 0.166) * 1e6
         self.nu_multiplier = kwargs.get("nu_multiplier", 0)  # Scale from 0 to 1
         self.k_torsion_multiplier = kwargs.get("k_torsion_multiplier", 5e3)
-        self.k_torsion_multiplier_serial = kwargs.get("k_torsion_multiplier_serial", 5e3)
+        self.k_torsion_multiplier_serial = kwargs.get(
+            "k_torsion_multiplier_serial", 5e3
+        )
         self.k_repulsive_multiplier = kwargs.get("k_repulsive", 2) * 1e6
         # DEBUG
         # print(
@@ -94,6 +95,7 @@ class FreeAssembly:
         rod_info,
         connect_info,
         verbose: bool = True,
+        prepend_tag: str = "",
     ):
         """
         if not verbose:
@@ -120,6 +122,7 @@ class FreeAssembly:
             connect_spec = json.load(json_data_file)
             segments = connect_spec["Segments"]
             activations = connect_spec["Activations"]
+            self.toggle_gravity = connect_spec["Misc"]["Gravity"]
         self.num_activation += len(activations)
 
         # create segment
@@ -138,6 +141,8 @@ class FreeAssembly:
                 base_position = seg["base_position"][rod_i]
                 y_rotation = seg["y-rotation"][rod_i]
                 rod_name = "%s_%d_%s" % (seg_name, rod_i, rod_type)
+                if prepend_tag:
+                    rod_name = f"{prepend_tag}_{rod_name}"
 
                 rod_spec = rod_specs[rod_type].copy()
 
@@ -168,6 +173,8 @@ class FreeAssembly:
                 # link activations
                 actuation_names = []
                 for _actuation_name, rod_list in activations.items():
+                    if prepend_tag:
+                        _actuation_name = f"{prepend_tag}_{_actuation_name}"
                     for data in rod_list:
                         if data[0] == seg_name and data[1] == rod_i:
                             actuation_names.append(_actuation_name)
@@ -235,7 +242,9 @@ class FreeAssembly:
                 ramp_up_time=1.0,
             )
 
-    def generate_callbacks(self, step_skip, time_interval=None, callback_class=None, **kwargs):
+    def generate_callbacks(
+        self, step_skip, time_interval=None, callback_class=None, **kwargs
+    ):
         data_rods = {}
         for rod_name in self.free.keys():
             data_rods[rod_name] = self.add_callback(
@@ -257,7 +266,9 @@ class FreeAssembly:
     def get_actuation_reference(self, actuation_names):
         if len(actuation_names) == 0:
             return None
-        actuation_ref = lambda: sum([self.actuation[key] for key in tuple(actuation_names)])
+        actuation_ref = lambda: sum(
+            [self.actuation[key] for key in tuple(actuation_names)]
+        )
         return actuation_ref
 
     def create_rod(self, name, is_first_segment=True, verbose=False, **rod_spec):
@@ -328,11 +339,11 @@ class FreeAssembly:
             )
             self.simulator.dampen(rod).using(
                 LaplaceDissipationFilterV2,
-                filter_order=3,
+                filter_order=5,
             )
 
         # Constrain one end of the rod (TODO : Modify for serial connection)
-        if True and is_first_segment:
+        if is_first_segment:
             self.simulator.constrain(rod).using(
                 FreeBaseEndSoftFixed,
                 constrained_position_idx=(0, 1, 2, 3, 4),
@@ -343,7 +354,7 @@ class FreeAssembly:
             )
 
         # Gravity
-        if True and self.toggle_gravity:
+        if self.toggle_gravity:
             self.simulator.add_forcing_to(rod).using(
                 GravityForces,
                 # acc_gravity=np.array([0.0, 9.80665, 0.0]),  # Reverse direction

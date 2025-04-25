@@ -604,7 +604,7 @@ def _compute_geometry_from_state(position_collection, volume, lengths, tangents)
         # radius[k] = np.sqrt(volume[k] / lengths[k] / np.pi)
 
 
-@numba.njit(cache=True) #, error_model='numpy')
+@numba.njit(cache=True)  # , error_model='numpy')
 def _compute_all_dilatations(
     position_collection,
     director_collection,
@@ -629,14 +629,17 @@ def _compute_all_dilatations(
     # _, local_twist = _compute_twist(
     #    position_collection[None, ...], director_collection[0][None, ...]
     # )
-    for k in range(lengths.shape[0] - 1):  # start from 1: first element is always 0
+    for k in range(1, lengths.shape[0]):  # start from 1: first element is always 0
         R_diff = np.dot(
-            director_collection[:, :, k], director_collection[:, :, k + 1].T
+            director_collection[:, :, k - 1], director_collection[:, :, k].T
         )
         trace_value = np.trace(R_diff)
         angle = np.arccos((trace_value - 1) / 2.0 - 1e-10)
-        delta_turn[k + 1] = angle
-        # delta_turn[k + 1] = 0
+        signed_angle = (angle / (2 * np.sin(angle))) * (R_diff[1, 0] - R_diff[0, 1])
+
+        delta_turn[k] = signed_angle
+        # delta_turn[k] = angle
+        # delta_turn[k] = 0
     # print(delta_turn)
 
     _compute_geometry_from_state(position_collection, volume, lengths, tangents)
@@ -687,7 +690,7 @@ def _compute_all_dilatations(
         # volume[k] = np.pi * lengths[k] * radius[k] ** 2
         # breakpoint()
 
-        # G. Krishnan 2015 (22)-(24)
+        # Method 1: G. Krishnan 2015 (22)-(24)
         alpha_angle[k] = np.arctan(
             (lambda_2 / dilatation[k])
             * (
@@ -702,7 +705,8 @@ def _compute_all_dilatations(
                 + (initial_radius[k] / rest_lengths[k]) * delta_turn[k]
             )
         )
-        # Constant fiber length assumption
+
+        # Method 2: Constant fiber length assumption
         # alpha_angle[k] = sgn_alpha*np.arccos(dilatation[k] * np.cos(initial_alpha_angle[k]))
         # beta_angle[k] = sgn_beta*np.arccos(dilatation[k] * np.cos(initial_beta_angle[k]))
 
@@ -711,7 +715,7 @@ def _compute_all_dilatations(
         #     breakpoint()
 
         # DEBUG
-        #if np.isnan(alpha_angle[k]):
+        # if np.isnan(alpha_angle[k]):
         #    breakpoint()
 
     # Cmopute eq (3.4) from 2018 RSOS paper

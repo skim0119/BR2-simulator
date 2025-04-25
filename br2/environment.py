@@ -696,6 +696,7 @@ class BatchEnvironment:
         rod_database_path: str,
         assembly_config_path: str,
         verbose: bool = True,
+        prepend_tag: str = "",
         **kwargs,
     ) -> None:
         """
@@ -713,6 +714,10 @@ class BatchEnvironment:
         ), "Assembly configuration does not exists."
 
         # Set action
+        if prepend_tag:
+            action_name = {
+                f"{prepend_tag}_{key}": value for key, value in action.items()
+            }
         self.assy.set_actuation(action_name)
 
         # rod name -> [seg,rod]

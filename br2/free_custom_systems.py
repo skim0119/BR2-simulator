@@ -7,11 +7,13 @@ from elastica._linalg import _batch_cross, _batch_dot
 from elastica._linalg import _batch_product_i_k_to_ik
 from elastica.boundary_conditions import ConstraintBase
 from elastica.external_forces import EndpointForces
+from elastica.contact_forces import RodRodContact
 
 from br2.linalg import (
     _single_inv_rotate,
 )
 
+import math
 import numpy as np
 import numba
 from numba import njit
@@ -364,21 +366,27 @@ class FreeCombinedActuation(NoForces):
     def apply_forces(self, system: "FreeCosseratRod", time):
         factor = min(1.0, time / self.ramp_up_time)
         pressure = self.actuation_ref() * self.scale * factor
-        a, b = self.nb_apply_forces_and_torques(
-            rod_external_forces=system.external_forces,
-            rod_external_torques=system.external_torques,
-            pressure=pressure,
-            radius=system.radius,
-            alpha_angle=system.alpha_angle,
-            beta_angle=system.beta_angle,
-            # alpha_angle=system.initial_alpha_angle,
-            # beta_angle=system.initial_beta_angle,
-            tangents=system.tangents,
-            n_elems=system.n_elems,
-            skip_element_pre=0,
-            skip_element_post=0,
-        )
-        if self._counter % 1000 == 0:
+        if math.isclose(
+            pressure, 0.0
+        ):  # This is to save some unnecessary activation with small pressure
+            a = np.zeros(system.n_elems, dtype=np.float_)
+            b = np.zeros(system.n_elems, dtype=np.float_)
+        else:
+            a, b = self.nb_apply_forces_and_torques(
+                rod_external_forces=system.external_forces,
+                rod_external_torques=system.external_torques,
+                pressure=pressure,
+                radius=system.radius,
+                alpha_angle=system.alpha_angle,
+                beta_angle=system.beta_angle,
+                # alpha_angle=system.initial_alpha_angle,
+                # beta_angle=system.initial_beta_angle,
+                tangents=system.tangents,
+                n_elems=system.n_elems,
+                skip_element_pre=0,
+                skip_element_post=0,
+            )
+        if self._counter % 10000 == 0:
             self._counter = 0
             # self._time.append(time)
             # self._force.append(a.max())
@@ -392,7 +400,7 @@ class FreeCombinedActuation(NoForces):
             # plt.show(block=False)
             # plt.pause(0.01)
 
-            # print(f"Force: {a.max()}, Torque: {b.max()}")
+            # print(f"{time=:.2f} | Pressure: {pressure:.02e} || Force: {np.abs(a).max():.02f}, Torque: {np.abs(b).max():.02f}, maxDelta={system.delta_turn.max():.02f}, minDelta={system.delta_turn.min():.02f}, maxDil={system.dilatation.max():.02f}, minDil={system.dilatation.min():.02f}")
             # print(f"delta: {system.delta_turn=}")
             # print(f"delta: {system.alpha_angle=}")
             # print(f"delta: {system.beta_angle=}")
@@ -425,10 +433,7 @@ class FreeCombinedActuation(NoForces):
 
         # Compute axial force per elements
         F_scale = -(
-            # 3e-1
-            1e0
-            * (pSaSb * Sa * Sb * Sa_b**2)
-            / ((Sa * Sb * Sa_b) ** 2 + (Sa**2 - Sb**2) ** 2)
+            (pSaSb * Sa * Sb * Sa_b**2) / ((Sa * Sb * Sa_b) ** 2 + (Sa**2 - Sb**2) ** 2)
         )
         force_on_one_element = pressure * np.pi * radius**2 * F_scale / n_elems
 
@@ -438,16 +443,13 @@ class FreeCombinedActuation(NoForces):
         )
         torque_on_one_element = pressure * np.pi * radius**3 * M_scale / n_elems
 
-        # print(f"Force: {force_on_one_element.max()}, Torque: {torque_on_one_element.max()}")
-        # print(f"alpha: {np.rad2deg(alpha_angle.min())}-{np.rad2deg(alpha_angle.max())}, beta: {np.rad2deg(beta_angle.min())}-{np.rad2deg(beta_angle.max())}")
-
-        # Angular Actuation
+        # Add on angular actuation
         for i in range(skip_element_pre, n_elems - skip_element_post - 1):
             rod_external_torques[2, i] -= torque_on_one_element[i + 1]
         for i in range(skip_element_pre + 1, n_elems - skip_element_post):
             rod_external_torques[2, i] += torque_on_one_element[i - 1]
 
-        # Linear Actuation
+        # Add on linear actuation
         rod_external_forces[..., skip_element_pre] -= (
             force_on_one_element[skip_element_pre] * tangents[..., skip_element_pre]
         )
@@ -477,4 +479,12 @@ class FreeCombinedActuation(NoForces):
 
     def apply_torques(self, system: "FreeCosseratRod", time):
         # Force and torque included together
+        pass
+
+
+class RodRodContactInterval(RodRodContact):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def apply_contact(self, system_one, system_two):
         pass
