@@ -1,10 +1,54 @@
 import numpy as np
 from elastica._rotations import _get_rotation_matrix
-from elastica._boundary_conditions import ConstraintBase
+from elastica.boundary_conditions import ConstraintBase
 
 import numba
 from numba import njit
 
+class FixFix(ConstraintBase):
+    """
+    This boundary condition class fixes one end of the rod. Currently,
+    this boundary condition fixes position and directors
+    at the first node and first element of the rod.
+        Attributes
+        ----------
+        fixed_positions : numpy.ndarray
+            2D (dim, 1) array containing data with 'float' type.
+        fixed_directors : numpy.ndarray
+            3D (dim, dim, 1) array containing data with 'float' type.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        system = kwargs["_system"]
+        self.fixed_position = system.position_collection
+        self.fixed_directors = system.director_collection
+
+
+    def constrain_values(self, rod, time):
+        self.compute_contrain_values(
+            rod.position_collection,
+            self.fixed_position,
+            rod.director_collection,
+            self.fixed_directors,
+        )
+
+    def constrain_rates(self, rod, time):
+        self.compute_constrain_rates(rod.velocity_collection, rod.omega_collection)
+
+    @staticmethod
+    @njit(cache=True)
+    def compute_contrain_values(
+        position_collection, fixed_position, director_collection, fixed_directors
+    ):
+        position_collection = fixed_position
+        director_collection = fixed_directors
+
+    @staticmethod
+    @njit(cache=True)
+    def compute_constrain_rates(velocity_collection, omega_collection):
+        velocity_collection[:] = 0.0
+        omega_collection[:] = 0.0
 
 class LastEndFixedRod(ConstraintBase):
     """

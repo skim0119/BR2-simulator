@@ -480,11 +480,3 @@ class FreeCombinedActuation(NoForces):
     def apply_torques(self, system: "FreeCosseratRod", time):
         # Force and torque included together
         pass
-
-
-class RodRodContactInterval(RodRodContact):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def apply_contact(self, system_one, system_two):
-        pass
