@@ -14,6 +14,7 @@ dependencies = [
     "pydantic",
     "dmosopt @ git+https://github.com/iraikov/dmosopt",
     "pyelastica",
+    "bsr",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +36,7 @@ allow-direct-references = true
 
 [tool.uv.sources]
 pyelastica = { git = "https://github.com/GazzolaLab/PyElastica", branch = "update-0.3.3" }
+bsr = { git = "https://github.com/GazzolaLab/Blender-Soft-Rod" }
 
 [build-system]
 requires = ["hatchling"]
