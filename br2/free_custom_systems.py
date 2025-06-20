@@ -71,6 +71,7 @@ class FreeBendActuation(NoForces):
             scale_linear_actuation=self.scale_linear_actuation
         )
 
+
     @staticmethod
     @njit(cache=True)
     def nb_apply_moment(

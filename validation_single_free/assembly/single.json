@@ -3,17 +3,20 @@
     "Date": "2021-10-11",
     "Info": "Single-segment BR2 Assembly",
     "Segments": {
-        "seg1": {
+        "seg": {
             "rod_order": ["Rod"],
             "base_position": [
                 [0.0, 0.0]
             ],
-            "y-rotation":[0.0, 0.0, 0.0]
+            "y-rotation": [0.0]
         }
     },
     "Activations": {
-        "action0": [
-            ["seg1", 0]
+        "action": [
+            ["seg", 0]
         ]
+    },
+    "Misc": {
+        "Gravity": true
     }
 }

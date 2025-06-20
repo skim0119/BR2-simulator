@@ -160,7 +160,7 @@ class FreeAssembly:
                 rod_spec["base_radius"] = rod_spec["outer_radius"]
 
                 # Set fiber angles
-                if "gamma" in rod_spec:
+                if "gamma" in rod_spec and rod_spec["gamma"] is not None:
                     rod_spec["gamma"] = rod_spec["gamma"] + y_rotation
                 else:
                     rod_spec["gamma"] = None

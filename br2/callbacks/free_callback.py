@@ -6,11 +6,12 @@ from elastica.typing import RodType
 
 
 class FreeCallback(CallBackBaseClass):
-    def __init__(self, step_skip: int, callback_params: dict, time_interval=None, **kwargs,):
-        super().__init__(self, **kwargs)
+    def __init__(self, step_skip: int, callback_params: dict, time_interval=None, actuation_ref=None, **kwargs):
+        super().__init__(**kwargs)
         self.every = step_skip
         self.time_interval = time_interval
         self.callback_params = callback_params
+        self.actuation_ref = actuation_ref
 
     def make_callback(self, system, time, current_step: int):
         if current_step % self.every != 0:
@@ -42,6 +43,8 @@ class FreeCallback(CallBackBaseClass):
             system.compute_position_center_of_mass().copy()
         )
         # self.callback_params["vcom"].append(system.compute_velocity_center_of_mass())
+
+        self.callback_params["actuation"].append(self.actuation_ref())
 
         self.callback_params["volume"].append(system.volume.copy())
         self.callback_params["alpha_angle"].append(system.alpha_angle.copy())
