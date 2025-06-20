@@ -21,20 +21,25 @@ import matplotlib.pyplot as plt
 
 
 class TipLoad(EndpointForces):
+    def __init__(self, time_interval, **kwargs):
+        self.time_interval = time_interval
+        super().__init__(**kwargs)
+
     def apply_forces(self, system, time):
-        if time > 28.3:
+        if self.time_interval[0] < time < self.time_interval[1]:
             super().apply_forces(system, time)
 
 
 # Defining Variable Bending
 class FreeBendActuation(NoForces):
 
-    def __init__(self, actuation_ref, z_angle, scale, ramp_up_time=1.0, gamma_tilt=0.0):
+    def __init__(self, actuation_ref, z_angle, scale, ramp_up_time=1.0, gamma_tilt=0.0, scale_linear_actuation=1.0):
         super(FreeBendActuation, self).__init__()
         self.actuation_ref = actuation_ref
         self.z_angle = z_angle
         self.gamma_tilt = gamma_tilt
         self.scale = scale
+        self.scale_linear_actuation = scale_linear_actuation
         self.ramp_up_time = ramp_up_time
 
     def apply_torques(self, system, time=0.0):
@@ -63,6 +68,7 @@ class FreeBendActuation(NoForces):
             n_elems=system.n_elems,
             skip_element_pre=0,
             skip_element_post=0,
+            scale_linear_actuation=self.scale_linear_actuation
         )
 
     @staticmethod
@@ -81,6 +87,7 @@ class FreeBendActuation(NoForces):
         n_elems,
         skip_element_pre,
         skip_element_post,
+        scale_linear_actuation,
     ):
         Sa = np.sin(alpha_angle)
         Sb = np.sin(beta_angle)
@@ -97,7 +104,6 @@ class FreeBendActuation(NoForces):
 
         # Compute moment
         _some_scale_linear_actuation_to_moment = 1.0
-        _some_scale_linear_actuation = 1.0
 
         # print(f"alpha: {np.rad2deg(alpha_angle.min())}-{np.rad2deg(alpha_angle.max())}, beta: {np.rad2deg(beta_angle.min())}-{np.rad2deg(beta_angle.max())}")
 
@@ -156,7 +162,7 @@ class FreeBendActuation(NoForces):
             )
 
         # Linear Actuation
-        _force_on_one_element = force_on_one_element * _some_scale_linear_actuation
+        _force_on_one_element = force_on_one_element * scale_linear_actuation
         rod_external_forces[..., skip_element_pre] -= (
             _force_on_one_element[skip_element_pre] * tangents[..., skip_element_pre]
         )
@@ -177,13 +183,9 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         fixed_position1,
         fixed_position2,
         fixed_position3,
-        fixed_position4,
-        fixed_position5,
         fixed_directors1,
         fixed_directors2,
         fixed_directors3,
-        fixed_directors4,
-        fixed_directors5,
         k,
         nu,
         kt,
@@ -203,8 +205,6 @@ class FreeBaseEndSoftFixed(ConstraintBase):
                 fixed_position1,
                 fixed_position2,
                 fixed_position3,
-                fixed_position4,
-                fixed_position5,
             ],
             axis=-1,
         )
@@ -213,8 +213,6 @@ class FreeBaseEndSoftFixed(ConstraintBase):
                 fixed_directors1,
                 fixed_directors2,
                 fixed_directors3,
-                fixed_directors4,
-                fixed_directors5,
             ],
             axis=-1,
         )
@@ -222,7 +220,7 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         self.nu = nu
         self.kt = kt
 
-        self.fixing_slice = 5
+        self.fixing_slice = 3
 
         # Accumulated rotation
         self.rev = 0

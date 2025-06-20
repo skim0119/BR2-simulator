@@ -265,12 +265,14 @@ class MemoryBlockConnections(Connections):
                 index_one=first_connect_idx,
                 system_two=system_two,
                 index_two=second_connect_idx,
+                time=time,
             )
             connect_instance.apply_torques(
                 system_one=system_one,
                 index_one=first_connect_idx,
                 system_two=system_two,
                 index_two=second_connect_idx,
+                time=time,
             )
 
         for p, connection in zip(self._connections_list, self._connections):

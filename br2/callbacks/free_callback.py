@@ -6,8 +6,8 @@ from elastica.typing import RodType
 
 
 class FreeCallback(CallBackBaseClass):
-    def __init__(self, step_skip: int, callback_params: dict, time_interval=None):
-        CallBackBaseClass.__init__(self)
+    def __init__(self, step_skip: int, callback_params: dict, time_interval=None, **kwargs,):
+        super().__init__(self, **kwargs)
         self.every = step_skip
         self.time_interval = time_interval
         self.callback_params = callback_params

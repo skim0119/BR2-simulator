@@ -2,16 +2,20 @@ __all__ = ["BlenderRodCallback"]
 
 import bpy
 import numpy as np
+from matplotlib import cm
+from matplotlib import colors
 from elastica import CallBackBaseClass
 from elastica.typing import RodType
 
 from bsr import frame_manager
 from bsr import BezierSplinePipe
 
-from bsr import RodWithCylinder as Rod
+# from bsr import RodWithCylinder as Rod
+# from bsr import RodWithBox as Rod  # Need to pass director
+from bsr import BezierSplinePipe as Rod
 
-# from bsr import RodWithBox as Rod
 
+ZOFFSET = 0.35
 
 class BlenderRodCallback(CallBackBaseClass):
     """
@@ -23,9 +27,12 @@ class BlenderRodCallback(CallBackBaseClass):
         step_skip: int,
         time_interval: int,
         callback_params=None,
-        scale: float = 100.0,
+        scale: float = 10.0,
         visualize_alpha_beta=True,
         is_ring=False,
+        actuation_ref=None,
+        actuation_max=100,
+        cmap="Oranges",
         **kwargs
     ) -> None:
         CallBackBaseClass.__init__(self, **kwargs)
@@ -35,6 +42,7 @@ class BlenderRodCallback(CallBackBaseClass):
         self.scale = scale
         self.stop = False
 
+        self.initialized = False
         self.bsr_rod: Rod
         self.bsr_splines_alpha: list[BezierSplinePipe]
         self.bsr_splines_beta: list[BezierSplinePipe]
@@ -42,6 +50,10 @@ class BlenderRodCallback(CallBackBaseClass):
 
         self.visualize_alpha_beta = visualize_alpha_beta
         self.is_ring = is_ring
+
+        self.actuation_ref = actuation_ref  # if none, no action input.
+        self.actuation_max = actuation_max
+        self.cmap = cmap
 
     def make_callback(
         self, system: RodType, time: np.floating, current_step: int
@@ -55,7 +67,7 @@ class BlenderRodCallback(CallBackBaseClass):
             return
 
         # Halting if there are NaNs in the system
-        if np.isnan(system.position_collection).any() or np.isnan(system.radius).any():
+        if np.isnan(system.position_collection).any() or np.isnan(system.radius).any() or np.isnan(system.director_collection).any():
             self.stop = True
             return
         if hasattr(system, "alpha_angle") and (
@@ -65,11 +77,44 @@ class BlenderRodCallback(CallBackBaseClass):
             return
 
         # Update rod
-        if current_step == 0:
+        if not self.initialized:
             self.initialize(system)
+            self.initialized = True
         else:
             self.update_states(system)
+        # Update action
+        if self.actuation_ref is None:
+            pressure = 0.0
+        else:
+            pressure = self.actuation_ref()
+        rgba = self.map_pressure_to_rgba(pressure, x_max=self.actuation_max, cmap=self.cmap)
+        self.bsr_rod.update_material(color=np.array(rgba))
+
         self.update_keyframes()
+
+    def map_pressure_to_rgba(self, x:float, x_max:float, cmap:str) -> tuple[float, float, float, float]:
+        """
+        Map a value x ∈ [0, x_max] to an RGBA color in the 'Oranges' colormap.
+
+        Parameters
+        ----------
+        x : float
+            Input value, should satisfy 0 <= x <= x_max.
+        x_max : float
+            Maximum value of the range. Must be > 0.
+
+        Returns
+        -------
+        rgba : tuple of four floats
+            Corresponding (r, g, b, a) color, each in [0, 1].
+        """
+        if x_max <= 0:
+            raise ValueError("x_max must be positive")
+        x_clipped = max(0.0, min(x, x_max))
+        norm = colors.Normalize(vmin=0.0, vmax=x_max)
+        cmap = cm.get_cmap(cmap)
+        rgba = cmap(norm(x_clipped))
+        return rgba  # rgba is (r, g, b, a)
 
     @staticmethod
     def find_helix(
@@ -117,13 +162,13 @@ class BlenderRodCallback(CallBackBaseClass):
         return points, radii
 
     def initialize(self, system) -> None:
-        positions = system.position_collection
+        positions = system.position_collection + np.array([0.0, 0.0, ZOFFSET])[:, None]
         if self.is_ring:
             positions = np.append(positions, positions[..., :1], axis=1)
         self.bsr_rod = Rod(
             positions=positions * self.scale,
             radii=system.radius * self.scale,
-            # system.director_collection,
+            # directors=system.director_collection,
         )
 
         self.bsr_splines_alpha = []
@@ -167,7 +212,7 @@ class BlenderRodCallback(CallBackBaseClass):
             )
 
     def update_states(self, system) -> None:
-        positions = system.position_collection
+        positions = system.position_collection + np.array([0.0, 0.0, ZOFFSET])[:, None]
         if self.is_ring:
             positions = np.append(positions, positions[..., :1], axis=1)
         self.bsr_rod.update_states(
@@ -182,7 +227,7 @@ class BlenderRodCallback(CallBackBaseClass):
         # Add alpha angle
         for i in range(self.num_splines):
             positions, radii = self.find_helix(
-                system.position_collection,
+                system.position_collection + np.array([0.0, 0.0, ZOFFSET])[:,None],
                 system.lengths,
                 system.radius,
                 system.initial_radius,
@@ -197,7 +242,7 @@ class BlenderRodCallback(CallBackBaseClass):
         # Add beta angle
         for i in range(self.num_splines):
             positions, radii = self.find_helix(
-                system.position_collection,
+                system.position_collection + np.array([0.0, 0.0, ZOFFSET])[:,None],
                 system.lengths,
                 system.radius,
                 system.initial_radius,

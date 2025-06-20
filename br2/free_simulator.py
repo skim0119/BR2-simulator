@@ -28,14 +28,12 @@ from br2.surface_connection import (
 )
 
 from br2.free_custom_systems import (
-    TipLoad,
     FreeBendActuation,
     FreeBaseEndSoftFixed,
     FreeCombinedActuation,
 )
 from br2.callbacks import FreeCallback
 from br2.custom_dissipation import AnalyticalLinearDamperV2, LaplaceDissipationFilterV2
-from br2.modules.base_system import BaseSystemCollection as CustomBaseSystemCollection
 from br2.modules.base_system import BaseSystemCollection as CustomBaseSystemCollection
 from br2.modules.block_connections import MemoryBlockConnections
 
@@ -61,6 +59,7 @@ class FreeAssembly:
         self.simulator = BR2Simulator()
         self.actuation = defaultdict(lambda: 0.0)
         self.free = {}  # Key: <segment name>_<order>_<rod name>
+        self._rod_actuation_names = {}  # Key: rod name, value: actuation names
 
         # Parameter
         self.num_activation: int = 0
@@ -178,6 +177,7 @@ class FreeAssembly:
                     for data in rod_list:
                         if data[0] == seg_name and data[1] == rod_i:
                             actuation_names.append(_actuation_name)
+                self._rod_actuation_names[rod_name] = actuation_names
 
                 # build PyElastica rod
                 rod = self.add_free(
@@ -222,25 +222,11 @@ class FreeAssembly:
                     seg_rods,
                 )
 
-                # FIXME : Temporary
-                # self.add_tip_load(seg_rods)
-
             prev_seg_rods = seg_rods.copy()
 
         self.free.update(frees)
 
         return frees
-
-    def add_tip_load(self, rods):
-        weight = 0.027 / len(rods)
-        for rod_name in rods:
-            rod = self.free[rod_name]
-            self.simulator.add_forcing_to(rod).using(
-                TipLoad,
-                start_force=np.zeros(3),
-                end_force=np.array([0, 0, -1]) * weight,
-                ramp_up_time=1.0,
-            )
 
     def generate_callbacks(
         self, step_skip, time_interval=None, callback_class=None, **kwargs
@@ -252,6 +238,7 @@ class FreeAssembly:
                 step_skip,
                 time_interval=time_interval,
                 callback=callback_class,
+                actuation_ref=self.get_actuation_reference(self._rod_actuation_names[rod_name]),
                 **kwargs,
             )
         return data_rods
@@ -346,8 +333,8 @@ class FreeAssembly:
         if is_first_segment:
             self.simulator.constrain(rod).using(
                 FreeBaseEndSoftFixed,
-                constrained_position_idx=(0, 1, 2, 3, 4),
-                constrained_director_idx=(0, 1, 2, 3, 4),
+                constrained_position_idx=(0, 1, 2),
+                constrained_director_idx=(0, 1, 2),
                 k=1e9,
                 nu=0,
                 kt=0.0,
@@ -357,7 +344,6 @@ class FreeAssembly:
         if self.toggle_gravity:
             self.simulator.add_forcing_to(rod).using(
                 GravityForces,
-                # acc_gravity=np.array([0.0, 9.80665, 0.0]),  # Reverse direction
                 acc_gravity=np.array([0.0, 0.0, -9.80665]),  # Reverse direction
             )
 
@@ -380,6 +366,7 @@ class FreeAssembly:
             ramp_up_time = rod_spec.get("ramp_up_time", 1.0)
             if gamma is not None:
                 scale = rod_spec.get("moment_scale", 1.0)
+                scale_linear_actuation = rod_spec.get("linear_scale", 1.0)
                 gamma_tilt = rod_spec.get("gamma_tilt", 0.0)
                 self.simulator.add_forcing_to(rod).using(
                     FreeBendActuation,
@@ -388,6 +375,7 @@ class FreeAssembly:
                     scale=scale,
                     gamma_tilt=gamma_tilt,
                     ramp_up_time=ramp_up_time,
+                    scale_linear_actuation=scale_linear_actuation,
                 )
             else:
                 scale = rod_spec.get("twist_scale", 1.0)
@@ -408,14 +396,14 @@ class FreeAssembly:
                 rod2 = self.free[rod2_name]
                 self.tip_to_base_connection(rod1, rod2)
 
-    def add_callback(self, name, step_skip, callback=None, **kwargs):
+    def add_callback(self, name, step_skip, callback=None, actuation_ref=None, **kwargs):
         rod = self.free[name]
         # list which collected data will be append
         callback_params = defaultdict(list)
         if callback is None:
             callback = FreeCallback
         self.simulator.collect_diagnostics(rod).using(
-            callback, step_skip=step_skip, callback_params=callback_params, **kwargs
+            callback, step_skip=step_skip, callback_params=callback_params, actuation_ref=actuation_ref, **kwargs
         )
         return callback_params
 

@@ -129,8 +129,16 @@ class SurfaceJointSideBySide(FreeJoint):
             rod_two_direction_vec_in_material_frame
         ).T.copy()
 
+        self.flag_interval = False
+        if "time_interval" in kwargs:
+            self.time_interval: tuple[float,float] = kwargs["time_interval"][0]  # FIXME: [0] is due to block impl
+            self.flag_interval = True
+
     # Apply force is same as free joint
-    def apply_forces(self, system_one, index_one, system_two, index_two):
+    def apply_forces(self, system_one, index_one, system_two, index_two, time):
+        if self.flag_interval and (self.time_interval[1] < time or time < self.time_interval[0]):
+            return
+
         # TODO: documentation
         (
             self.rod_one_rd2,
@@ -299,7 +307,9 @@ class SurfaceJointSideBySide(FreeJoint):
             spring_force,
         )
 
-    def apply_torques(self, system_one, index_one, system_two, index_two):
+    def apply_torques(self, system_one, index_one, system_two, index_two, time):
+        if self.flag_interval and (self.time_interval[1] > time or time < self.time_interval[0]):
+            return
 
         self._apply_torques(
             self.spring_force,

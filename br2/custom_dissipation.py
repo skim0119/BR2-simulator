@@ -29,7 +29,7 @@ class AnalyticalLinearDamperV2(DamperBase):
 
         self.translational_damping_coefficient = np.exp(-damping_constant * time_step)
         self.rotational_damping_coefficient = np.exp(
-            -damping_constant
+            -(damping_constant*5)
             * time_step
             # * element_mass
             # * np.diagonal(self._system.inv_mass_second_moment_of_inertia).T
@@ -40,12 +40,13 @@ class AnalyticalLinearDamperV2(DamperBase):
             rod.velocity_collection,
             rod.omega_collection,
             self.translational_damping_coefficient,
+            self.rotational_damping_coefficient,
             rod.dilatation,
         )
 
 
 @njit(cache=True)
-def nb_dampen_rates(v, w, k, e):
+def nb_dampen_rates(v, w, k, kr, e):
     """
     v - velocity_collection : numpy.ndarray (3, n_node)
     w - omega_collection : numpy.ndarray (3, n_node-1)
@@ -58,7 +59,7 @@ def nb_dampen_rates(v, w, k, e):
         v[:, i] = v[:, i] * k
 
     for i in range(n_node - 1):
-        w[:, i] = w[:, i] * k ** e[i]
+        w[:, i] = w[:, i] * kr ** e[i]
 
 
 class LaplaceDissipationFilterV2(DamperBase):
@@ -82,8 +83,6 @@ class LaplaceDissipationFilterV2(DamperBase):
 
         self.velocity_filter_term = np.zeros_like(self._system.velocity_collection)
         self.omega_filter_term = np.zeros_like(self._system.omega_collection)
-        # self.acceleration_filter_term = np.zeros_like(self._system.acceleration_collection)
-        # self.alpha_filter_term = np.zeros_like(self._system.alpha_collection)
         self.kappa_filter_term = np.zeros_like(self._system.kappa)
         self.sigma_filter_term = np.zeros_like(self._system.sigma)
 
@@ -99,16 +98,6 @@ class LaplaceDissipationFilterV2(DamperBase):
             self.omega_filter_term,
             self.filter_order,
         )
-        # nb_filter_rate(
-        #     rod.acceleration_collection,
-        #     self.acceleration_filter_term,
-        #     self.filter_order,
-        # )
-        # nb_filter_rate(
-        #     rod.alpha_collection,
-        #     self.alpha_filter_term,
-        #     self.filter_order,
-        # )
         nb_filter_rate(
             rod.kappa,
             self.kappa_filter_term,

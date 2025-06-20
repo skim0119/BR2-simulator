@@ -22,6 +22,7 @@ from br2.visualize.twist_angle import visual_twist_with_surface
 from br2.free_simulator import FreeAssembly
 from br2.callbacks import BlenderRodCallback
 from br2.callbacks import OnlinePlottingRodStatus
+from br2.constants import psi2Nm2
 
 
 @dataclass
@@ -113,7 +114,7 @@ class TerminalInfo:
             for name in self.__dir__()
             if name.endswith("status") and "_nan_" in name and ("combined_" not in name)
         ]
-        return all(status_list)
+        return len(status_list) > 0 and all(status_list)
 
     @property
     def combined_steady_state_status(self) -> bool:
@@ -154,7 +155,7 @@ class Environment:
         run_tag: str,
         rendering_fps: int | None = 25,
         time_step: float = 2.0e-5,
-        capture_interval: Optional[tuple[float, float]] = None,
+        capture_interval: tuple[float, float] | None = None,
         export_blender: bool = False,
         visualize_alpha_beta: bool = True,
     ):
@@ -203,7 +204,8 @@ class Environment:
         start_time: float = 0.0,
         plot_states_online: bool = False,
         verbose: bool = True,
-        custom_callback: Callable | None = None,
+        custom_callbacks: list[Callable] | None = None,
+        restart_save_path = None,
         **kwargs,
     ) -> None:
         """
@@ -240,6 +242,7 @@ class Environment:
                 time_interval=self.capture_interval,
                 callback_class=BlenderRodCallback,
                 visualize_alpha_beta=self.visualize_alpha_beta,
+                actuation_max=25*psi2Nm2,  # FIXME: Probably need to be configured from outside
             )  # [seg,rod]
         if plot_states_online:
             self.assy.generate_callbacks(
@@ -248,11 +251,15 @@ class Environment:
                 callback_class=OnlinePlottingRodStatus,
             )  # [seg,rod]
 
-        custom_callback(self.simulator, self.shearable_rods)
+        if custom_callbacks is not None:
+            for custom_callback in custom_callbacks:
+                custom_callback(self.simulator, self.shearable_rods)
 
         # Finalize simulation environment. After finalize, you cannot add
         # any forcing, constrain or call back functions
         self.simulator.finalize()
+        if restart_save_path is not None:
+            self.load_state(directory=restart_save_path, verbose=verboase)
         self.time = start_time  # simulation time
 
     def run(
@@ -262,7 +269,7 @@ class Environment:
         disable_progress_bar: bool = False,
         check_nan: bool = False,
         check_steady_state: Optional[int] = None,
-        status_check_interval=1.0,
+        # status_check_interval=1.0,
         pbar: float | None = None,
         set_pbar_total: float | None = None,
     ) -> TerminalInfo:
@@ -304,7 +311,7 @@ class Environment:
         time = self.time
         if not duration:
             duration = self.time_step
-        next_status_check_time = time + status_check_interval
+        # next_status_check_time = time + status_check_interval
         if pbar is None:
             _pbar = tqdm(
                 total=time + duration,
@@ -321,20 +328,20 @@ class Environment:
                 self.time_step,
             )
             _pbar.update(self.time_step)
-            # Check NaN
-            if check_nan and time >= next_status_check_time:
-                # fmt: off
-                # Position of the rod cannot be NaN, it is not valid, stop the simulation
-                status.position_nan_status = any([_isnan_check(self.shearable_rods[name].position_collection) for name in self.shearable_rods.keys()] )
-                status.velocity_nan_status = any([_isnan_check(self.shearable_rods[name].velocity_collection) for name in self.shearable_rods.keys()])
-                status.director_nan_status = any([_isnan_check(self.shearable_rods[name].director_collection) for name in self.shearable_rods.keys()])
-                status.omega_nan_status = any([_isnan_check(self.shearable_rods[name].omega_collection) for name in self.shearable_rods.keys()])
-                next_status_check_time += status_check_interval
-                if status.combined_nan_status:
-                    break
-                # fmt: on
         if pbar is None:
             _pbar.close()
+        # Check NaN
+        if check_nan: # and time >= next_status_check_time:
+            # fmt: off
+            # Position of the rod cannot be NaN, it is not valid, stop the simulation
+            status.position_nan_status = any([_isnan_check(self.shearable_rods[name].position_collection) for name in self.shearable_rods.keys()] )
+            status.velocity_nan_status = any([_isnan_check(self.shearable_rods[name].velocity_collection) for name in self.shearable_rods.keys()])
+            status.director_nan_status = any([_isnan_check(self.shearable_rods[name].director_collection) for name in self.shearable_rods.keys()])
+            status.omega_nan_status = any([_isnan_check(self.shearable_rods[name].omega_collection) for name in self.shearable_rods.keys()])
+            # next_status_check_time += status_check_interval
+            # if status.combined_nan_status:
+            #     break
+            # fmt: on
         self.time = time
 
         # Check steady state
