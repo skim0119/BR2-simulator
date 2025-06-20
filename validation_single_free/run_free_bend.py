@@ -1,7 +1,7 @@
 import os
 import sys
 
-# sys.settrace
+from dataclasses import dataclass
 
 import tempfile
 import numpy as np
@@ -19,13 +19,21 @@ DEBUG = True
 EXPORT_BLENDER = False and DEBUG
 
 
+@dataclass
+class RunConfig:
+    length: float = 0.18
+    actuation: float
+    alpha: float
+    beta: float
+
+
 def single_free_bend(
     actuation_list,
     rod_database_path,
     assembly_config_path,
     alpha_list,
     beta_list,
-    tag="bend_validation",
+    tag="validation",
 ):
     # Prepare environment
     env = BatchEnvironment(run_tag=tag)
@@ -121,6 +129,7 @@ def single_free_bend(
 
 
 if __name__ == "__main__":
+
     # Query data
     from loader import load_data
 
@@ -161,8 +170,8 @@ if __name__ == "__main__":
 
     bends, lengths = single_free_bend(
         actuations,
-        "rod_library/standard_18.json",
-        "assembly/free_bend_18cm_85_85.json",
+        "rod_library/standard.json",
+        "assembly/single.json",
         alpha_list,
         beta_list,
     )
