@@ -1,0 +1,28 @@
+{
+    "Info": "FREE properties",
+    "DefaultParams": {
+        "Info"             : "Default parameters for FREE",
+        "n_elements"       : 60,
+        "direction"        : [0.0,0.0,-1.0],
+        "normal"           : [-1.0,0.0,0.0],
+        "base_length"      : 0.18,
+        "outer_radius"     : 0.008522,
+        "inner_radius"     : 0.0047625,
+        "density"          : 2300,
+        "damping_constant" : 55,
+        "youngs_modulus"   : 1.56e6,
+        "shear_modulus"    : 0.52e6,
+        "alpha"            : 0,
+        "beta"             : 0
+    },
+    "Rods": {
+        "Rod": {
+            "Info"  : "Simple bend rod for test",
+            "alpha" : 85,
+            "beta" : -85,
+            "gamma" : 120,
+            "moment_scale": 2.5e-1,
+            "twist_scale": 2e1
+        }
+    }
+}
