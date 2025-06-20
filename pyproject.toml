@@ -1,38 +1,41 @@
-[tool.poetry]
+[project]
 name = "br2"
 version = "0.1.1"
 description = "Cosserat Rod based FREE assembly simulator"
-authors = ["Seung Hyun Kim <skim0119@gmail.com>"]
-license = "MIT"
+authors = [
+    {name = "Seung Hyun Kim", email = "skim0119@gmail.com"}
+]
+license = {text = "MIT"}
 readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "tqdm",
+    "matplotlib",
+    "pydantic",
+    "dmosopt @ git+https://github.com/iraikov/dmosopt",
+    "pyelastica",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.8,<3.11"
-pyelastica = ">=0.3.1"
-tqdm = "^4.65.0"
-matplotlib = "^3.7.1"
-pydantic = "^2.8.2"
-dmosopt = {git = "https://github.com/iraikov/dmosopt"}
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-mock",
+]
+docs = [
+    "sphinx",
+    "sphinx-book-theme",
+    "numpydoc",
+    "myst-nb",
+    "sphinx-autodoc-typehints",
+    "readthedocs-sphinx-search",
+]
 
-[tool.poetry.group.dev]
-optional = true
+[tool.hatch.metadata]
+allow-direct-references = true
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.3.1"
-pytest-mock = "^3.10.0"
-
-
-[tool.poetry.group.docs]
-optional = true
-
-[tool.poetry.group.docs.dependencies]
-sphinx = "*"
-sphinx-book-theme = "^1.0.1"
-numpydoc = "^1.5.0"
-myst-nb = "^0.17.2"
-sphinx-autodoc-typehints = "^1.23.0"
-readthedocs-sphinx-search = "^0.3.1"
+[tool.uv.sources]
+pyelastica = { git = "https://github.com/GazzolaLab/PyElastica", branch = "update-0.3.3" }
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
