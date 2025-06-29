@@ -233,7 +233,7 @@ class SurfaceJointSideBySide(FreeJoint):
 
         # Compute spring force between two rods
         distance_vector = surface_position_rod_two - surface_position_rod_one
-        np.round_(distance_vector, 12, distance_vector)
+        np.round(distance_vector, 12, distance_vector)
         spring_force = k * (distance_vector)
 
         # Damping force
@@ -271,7 +271,7 @@ class SurfaceJointSideBySide(FreeJoint):
             + offset_rod_two
         )
 
-        np.round_(penetration_strain, 12, penetration_strain)
+        np.round(penetration_strain, 12, penetration_strain)
         # Contact present only if rods penetrate to each other
         idx_penetrate = np.where(penetration_strain < 0)[0]
         k_contact = np.zeros(index_one.shape[0])
