@@ -53,7 +53,7 @@ class FreeCallback(CallBackBaseClass):
 
 
 class OnlinePlottingRodStatus(CallBackBaseClass):
-    def __init__(self, step_skip: int, callback_params: dict, time_interval=None):
+    def __init__(self, step_skip: int, callback_params: dict, time_interval=None, actuation_ref=None, **kwargs):
         CallBackBaseClass.__init__(self)
         self.every = step_skip
         self.time_interval = time_interval
