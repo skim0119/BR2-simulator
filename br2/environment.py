@@ -205,7 +205,7 @@ class Environment:
         plot_states_online: bool = False,
         verbose: bool = True,
         custom_callbacks: list[Callable] | None = None,
-        restart_save_path = None,
+        restart_save_path=None,
         **kwargs,
     ) -> None:
         """
@@ -242,7 +242,8 @@ class Environment:
                 time_interval=self.capture_interval,
                 callback_class=BlenderRodCallback,
                 visualize_alpha_beta=self.visualize_alpha_beta,
-                actuation_max=25*psi2Nm2,  # FIXME: Probably need to be configured from outside
+                actuation_max=25
+                * psi2Nm2,  # FIXME: Probably need to be configured from outside
             )  # [seg,rod]
         if plot_states_online:
             self.assy.generate_callbacks(
@@ -331,7 +332,7 @@ class Environment:
         if pbar is None:
             _pbar.close()
         # Check NaN
-        if check_nan: # and time >= next_status_check_time:
+        if check_nan:  # and time >= next_status_check_time:
             # fmt: off
             # Position of the rod cannot be NaN, it is not valid, stop the simulation
             status.position_nan_status = any([_isnan_check(self.shearable_rods[name].position_collection) for name in self.shearable_rods.keys()] )
@@ -669,7 +670,7 @@ class BatchEnvironment:
     def __init__(
         self,
         run_tag: str,
-        rendering_fps: int = 25,
+        rendering_fps: int | None = 25,
         time_step: float = 2.0e-5,
         capture_interval: Optional[tuple[float, float]] = None,
         **kwargs,
@@ -689,8 +690,12 @@ class BatchEnvironment:
         self.time_step = time_step
 
         # Recording speed
-        self.step_skip = max(1, int(1.0 / (rendering_fps * self.time_step)))
-        self.rendering_fps = rendering_fps
+        if rendering_fps is None:
+            self.step_skip = 1
+            self.rendering_fps = 25
+        else:
+            self.step_skip = max(1, int(1.0 / (rendering_fps * self.time_step)))
+            self.rendering_fps = rendering_fps
         self.capture_interval = capture_interval
 
         # Rod
@@ -721,9 +726,7 @@ class BatchEnvironment:
         ), "Assembly configuration does not exists."
 
         # Set action
-        action_name = {
-            f"{prepend_tag}_{key}": value for key, value in action.items()
-        }
+        action_name = {f"{prepend_tag}_{key}": value for key, value in action.items()}
         self.assy.set_actuation(action_name)
 
         # rod name -> [seg,rod]
