@@ -67,6 +67,7 @@ class FreeAssembly:
 
         # Scale by modulus
         self.k_multiplier = kwargs.get("k_multiplier", 0.166) * 1e6
+        self.k_multiplier_serial = kwargs.get("k_multiplier_serial", 0.166) * 1e7
         self.nu_multiplier = kwargs.get("nu_multiplier", 0)  # Scale from 0 to 1
         self.k_torsion_multiplier = kwargs.get("k_torsion_multiplier", 5e3)
         self.k_torsion_multiplier_serial = kwargs.get(
@@ -93,6 +94,7 @@ class FreeAssembly:
         self,
         rod_info,
         connect_info,
+        debug_step_every: int | None = None,
         verbose: bool = True,
         prepend_tag: str = "",
     ):
@@ -181,7 +183,11 @@ class FreeAssembly:
 
                 # build PyElastica rod
                 rod = self.add_free(
-                    rod_name, actuation_names, verbose=verbose, **rod_spec
+                    rod_name,
+                    actuation_names,
+                    debug_step_every=debug_step_every,
+                    verbose=verbose,
+                    **rod_spec,
                 )
 
                 frees[rod_name] = rod
@@ -238,7 +244,9 @@ class FreeAssembly:
                 step_skip,
                 time_interval=time_interval,
                 callback=callback_class,
-                actuation_ref=self.get_actuation_reference(self._rod_actuation_names[rod_name]),
+                actuation_ref=self.get_actuation_reference(
+                    self._rod_actuation_names[rod_name]
+                ),
                 **kwargs,
             )
         return data_rods
@@ -319,9 +327,13 @@ class FreeAssembly:
         # add damping
         if "damping_constant" in rod_spec:
             damping_constant = rod_spec["damping_constant"]
+            rot_damping_constant = rod_spec.get(
+                "rot_damping_constant", damping_constant * 5 * 2
+            )
             self.simulator.dampen(rod).using(
                 AnalyticalLinearDamperV2,
                 damping_constant=damping_constant,
+                rot_damping_constant=rot_damping_constant,
                 time_step=self.env.time_step,
             )
             self.simulator.dampen(rod).using(
@@ -333,8 +345,8 @@ class FreeAssembly:
         if is_first_segment:
             self.simulator.constrain(rod).using(
                 FreeBaseEndSoftFixed,
-                constrained_position_idx=(0, 1, 2),
-                constrained_director_idx=(0, 1, 2),
+                constrained_position_idx=(0,),  # (0, 1, 2),
+                constrained_director_idx=(0,),  # (0, 1, 2),
                 k=1e9,
                 nu=0,
                 kt=0.0,
@@ -354,6 +366,7 @@ class FreeAssembly:
         name,
         actuation_names,
         gamma: float | None = None,
+        debug_step_every: int | None = None,
         verbose: bool = True,
         **rod_spec,
     ):
@@ -379,11 +392,14 @@ class FreeAssembly:
                 )
             else:
                 scale = rod_spec.get("twist_scale", 1.0)
+                scale_linear_actuation = rod_spec.get("linear_scale", 1.0)
                 self.simulator.add_forcing_to(rod).using(
                     FreeCombinedActuation,
                     actuation_ref,
                     scale=scale,
+                    scale_linear=scale_linear_actuation,
                     ramp_up_time=ramp_up_time,
+                    debug_step_every=debug_step_every,
                 )
 
         return rod
@@ -396,14 +412,21 @@ class FreeAssembly:
                 rod2 = self.free[rod2_name]
                 self.tip_to_base_connection(rod1, rod2)
 
-    def add_callback(self, name, step_skip, callback=None, actuation_ref=None, **kwargs):
+    def add_callback(
+        self, name, step_skip, callback=None, actuation_ref=None, **kwargs
+    ):
         rod = self.free[name]
         # list which collected data will be append
         callback_params = defaultdict(list)
         if callback is None:
             callback = FreeCallback
         self.simulator.collect_diagnostics(rod).using(
-            callback, step_skip=step_skip, callback_params=callback_params, actuation_ref=actuation_ref, **kwargs
+            callback,
+            step_skip=step_skip,
+            callback_params=callback_params,
+            actuation_ref=actuation_ref,
+            name=name,
+            **kwargs,
         )
         return callback_params
 
@@ -496,7 +519,7 @@ class FreeAssembly:
         )
 
         print(f"  connecting tip to base: {rod_one} || {rod_two}")
-        print(f"    {k_conn=}, {self.k_multiplier=}, {self.nu_multiplier=}")
+        print(f"    {k_conn=}, {self.k_multiplier_serial=}, {self.nu_multiplier=}")
         print(f"    {self.k_torsion_multiplier=}")
 
         self.simulator.connect(
@@ -506,7 +529,7 @@ class FreeAssembly:
             second_connect_idx=rod_two_idx,
         ).using(
             SurfaceJointSideBySide,
-            k=k_conn * self.k_multiplier * 1e1,
+            k=k_conn * self.k_multiplier_serial,
             nu=self.nu_multiplier + 1e-4,
             k_repulsive=0.0,
             k_torsion=k_conn * self.k_torsion_multiplier_serial,

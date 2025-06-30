@@ -17,6 +17,7 @@ from bsr import BezierSplinePipe as Rod
 
 ZOFFSET = 0.35
 
+
 class BlenderRodCallback(CallBackBaseClass):
     """
     PyElastica callback to save rod state to Blender.
@@ -33,9 +34,9 @@ class BlenderRodCallback(CallBackBaseClass):
         actuation_ref=None,
         actuation_max=100,
         cmap="Oranges",
-        **kwargs
+        **kwargs,
     ) -> None:
-        CallBackBaseClass.__init__(self, **kwargs)
+        # CallBackBaseClass.__init__(self, **kwargs)
         self.every = step_skip
         self.time_interval = time_interval
         self.key_frame = 0
@@ -67,7 +68,11 @@ class BlenderRodCallback(CallBackBaseClass):
             return
 
         # Halting if there are NaNs in the system
-        if np.isnan(system.position_collection).any() or np.isnan(system.radius).any() or np.isnan(system.director_collection).any():
+        if (
+            np.isnan(system.position_collection).any()
+            or np.isnan(system.radius).any()
+            or np.isnan(system.director_collection).any()
+        ):
             self.stop = True
             return
         if hasattr(system, "alpha_angle") and (
@@ -87,12 +92,16 @@ class BlenderRodCallback(CallBackBaseClass):
             pressure = 0.0
         else:
             pressure = self.actuation_ref()
-        rgba = self.map_pressure_to_rgba(pressure, x_max=self.actuation_max, cmap=self.cmap)
+        rgba = self.map_pressure_to_rgba(
+            pressure, x_max=self.actuation_max, cmap=self.cmap
+        )
         self.bsr_rod.update_material(color=np.array(rgba))
 
         self.update_keyframes()
 
-    def map_pressure_to_rgba(self, x:float, x_max:float, cmap:str) -> tuple[float, float, float, float]:
+    def map_pressure_to_rgba(
+        self, x: float, x_max: float, cmap: str
+    ) -> tuple[float, float, float, float]:
         """
         Map a value x ∈ [0, x_max] to an RGBA color in the 'Oranges' colormap.
 
@@ -227,7 +236,7 @@ class BlenderRodCallback(CallBackBaseClass):
         # Add alpha angle
         for i in range(self.num_splines):
             positions, radii = self.find_helix(
-                system.position_collection + np.array([0.0, 0.0, ZOFFSET])[:,None],
+                system.position_collection + np.array([0.0, 0.0, ZOFFSET])[:, None],
                 system.lengths,
                 system.radius,
                 system.initial_radius,
@@ -242,7 +251,7 @@ class BlenderRodCallback(CallBackBaseClass):
         # Add beta angle
         for i in range(self.num_splines):
             positions, radii = self.find_helix(
-                system.position_collection + np.array([0.0, 0.0, ZOFFSET])[:,None],
+                system.position_collection + np.array([0.0, 0.0, ZOFFSET])[:, None],
                 system.lengths,
                 system.radius,
                 system.initial_radius,

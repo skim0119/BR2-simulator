@@ -33,7 +33,15 @@ class TipLoad(EndpointForces):
 # Defining Variable Bending
 class FreeBendActuation(NoForces):
 
-    def __init__(self, actuation_ref, z_angle, scale, ramp_up_time=1.0, gamma_tilt=0.0, scale_linear_actuation=1.0):
+    def __init__(
+        self,
+        actuation_ref,
+        z_angle,
+        scale,
+        ramp_up_time=1.0,
+        gamma_tilt=0.0,
+        scale_linear_actuation=1.0,
+    ):
         super(FreeBendActuation, self).__init__()
         self.actuation_ref = actuation_ref
         self.z_angle = z_angle
@@ -68,9 +76,8 @@ class FreeBendActuation(NoForces):
             n_elems=system.n_elems,
             skip_element_pre=0,
             skip_element_post=0,
-            scale_linear_actuation=self.scale_linear_actuation
+            scale_linear_actuation=self.scale_linear_actuation,
         )
-
 
     @staticmethod
     @njit(cache=True)
@@ -182,11 +189,7 @@ class FreeBaseEndSoftFixed(ConstraintBase):
     def __init__(
         self,
         fixed_position1,
-        fixed_position2,
-        fixed_position3,
         fixed_directors1,
-        fixed_directors2,
-        fixed_directors3,
         k,
         nu,
         kt,
@@ -204,16 +207,12 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         self.fixed_position = np.stack(
             [
                 fixed_position1,
-                fixed_position2,
-                fixed_position3,
             ],
             axis=-1,
         )
         self.fixed_directors = np.stack(
             [
                 fixed_directors1,
-                fixed_directors2,
-                fixed_directors3,
             ],
             axis=-1,
         )
@@ -221,14 +220,12 @@ class FreeBaseEndSoftFixed(ConstraintBase):
         self.nu = nu
         self.kt = kt
 
-        self.fixing_slice = 3
-
         # Accumulated rotation
         self.rev = 0
 
     def constrain_values(self, system, time):
-        system.position_collection[..., : self.fixing_slice] = self.fixed_position
-        system.director_collection[..., : self.fixing_slice] = self.fixed_directors
+        system.position_collection[..., :1] = self.fixed_position
+        system.director_collection[..., :1] = self.fixed_directors
         return
         self.restrict_position(
             system.position_collection[..., 0],
@@ -248,16 +245,16 @@ class FreeBaseEndSoftFixed(ConstraintBase):
 
     def constrain_rates(self, system, time):
         super().constrain_rates(system, time)
-        system.velocity_collection[..., : self.fixing_slice] = 0.0
-        system.omega_collection[..., : self.fixing_slice] = 0.0
-        system.acceleration_collection[..., : self.fixing_slice] = 0.0
-        system.alpha_collection[..., : self.fixing_slice] = 0.0
+        system.velocity_collection[..., :1] = 0.0
+        system.acceleration_collection[..., :1] = 0.0
+        system.omega_collection[..., :1] = 0.0
+        system.alpha_collection[..., :1] = 0.0
 
-        self.constrain_shear(system.sigma, system.kappa, self.fixing_slice)
+        # self.constrain_shear(system.sigma, system.kappa)
 
     @staticmethod
     @njit(cache=True)
-    def constrain_shear(sigma, kappa, fixing_slice):
+    def constrain_shear(sigma, kappa):
         pass
         # sigma[..., :fixing_slice] = 0.0
         # kappa[..., :fixing_slice] = 0.0
@@ -336,7 +333,14 @@ class FreeCombinedActuation(NoForces):
     Based on B. Joshua 2013
     """
 
-    def __init__(self, actuation_ref, scale, ramp_up_time=1.0):
+    def __init__(
+        self,
+        actuation_ref,
+        scale,
+        scale_linear,
+        ramp_up_time=1.0,
+        debug_step_every: int | None = None,
+    ):
         """
 
         Parameters
@@ -348,32 +352,35 @@ class FreeCombinedActuation(NoForces):
         """
         self.actuation_ref = actuation_ref
         self.scale = scale
+        self.scale_linear = scale_linear
         self.ramp_up_time = ramp_up_time
-
-        self.direction = np.array([0.0, 0.0, 1.0])  # system always in tangent
+        self.debug_step_every = debug_step_every
 
         self._counter = 0
         self._time = []
         self._force = []
         self._moment = []
-        fig = plt.figure()
-        self.ax = fig.add_subplot(111)
-        self.pl1 = self.ax.plot(self._force, label="Force")[0]
-        self.pl2 = self.ax.plot(self._moment, label="Moment")[0]
-        plt.legend()
+
+        if debug_step_every is not None:
+            fig = plt.figure()
+            self.axes = [fig.add_subplot(211), fig.add_subplot(212)]
+            self.pl1 = self.axes[0].plot(self._force, label="Force")[0]
+            self.pl2 = self.axes[1].plot(self._moment, label="Moment")[0]
+            plt.legend()
 
     def apply_forces(self, system: "FreeCosseratRod", time):
         factor = min(1.0, time / self.ramp_up_time)
-        pressure = self.actuation_ref() * self.scale * factor
-        if math.isclose(
-            pressure, 0.0
-        ):  # This is to save some unnecessary activation with small pressure
+        pressure = self.actuation_ref() * factor
+        if math.isclose(pressure, 0.0):
+            # This is to save some unnecessary activation with small pressure
             a = np.zeros(system.n_elems, dtype=np.float_)
             b = np.zeros(system.n_elems, dtype=np.float_)
         else:
             a, b = self.nb_apply_forces_and_torques(
                 rod_external_forces=system.external_forces,
                 rod_external_torques=system.external_torques,
+                scale=self.scale,
+                scale_linear=self.scale_linear,
                 pressure=pressure,
                 radius=system.radius,
                 alpha_angle=system.alpha_angle,
@@ -382,22 +389,23 @@ class FreeCombinedActuation(NoForces):
                 # beta_angle=system.initial_beta_angle,
                 tangents=system.tangents,
                 n_elems=system.n_elems,
-                skip_element_pre=0,
-                skip_element_post=0,
             )
-        if self._counter % 10000 == 0:
+        if (
+            self.debug_step_every is not None
+            and self._counter % self.debug_step_every == 0
+        ):
             self._counter = 0
             # self._time.append(time)
             # self._force.append(a.max())
             # self._moment.append(b.max())
-            # self.pl1.set_xdata(self._time)
-            # self.pl1.set_ydata(self._force)
-            # self.pl2.set_xdata(self._time)
-            # self.pl2.set_ydata(self._moment)
-            # self.ax.relim()
-            # self.ax.autoscale_view()
-            # plt.show(block=False)
-            # plt.pause(0.01)
+            self.pl1.set_xdata(np.arange(a.size))
+            self.pl1.set_ydata(a)
+            self.pl2.set_xdata(np.arange(b.size))
+            self.pl2.set_ydata(b)
+            self.axes[0].relim()
+            self.axes[1].relim()
+            self.axes[0].autoscale_view()
+            self.axes[1].autoscale_view()
 
             # print(f"{time=:.2f} | Pressure: {pressure:.02e} || Force: {np.abs(a).max():.02f}, Torque: {np.abs(b).max():.02f}, maxDelta={system.delta_turn.max():.02f}, minDelta={system.delta_turn.min():.02f}, maxDil={system.dilatation.max():.02f}, minDil={system.dilatation.min():.02f}")
             # print(f"delta: {system.delta_turn=}")
@@ -411,18 +419,18 @@ class FreeCombinedActuation(NoForces):
     def nb_apply_forces_and_torques(
         rod_external_forces,
         rod_external_torques,
+        scale,
+        scale_linear,
         pressure,
         radius,
         alpha_angle,
         beta_angle,
         tangents,
         n_elems,
-        skip_element_pre,
-        skip_element_post,
     ):
         # if alpha or beta is nan, breakpoint
         # if np.isnan(rod_external_forces).any() or np.isnan(beta_angle).any():
-        #    breakpoint()
+        #     breakpoint()
         Sa = np.sin(alpha_angle)
         Sb = np.sin(beta_angle)
         Ca = np.cos(alpha_angle)
@@ -431,38 +439,38 @@ class FreeCombinedActuation(NoForces):
         pSaSb = Sa * Sb + 2 * Ca * Cb  # Pitch * sin(a) * sin(b)
 
         # Compute axial force per elements
-        F_scale = -(
-            (pSaSb * Sa * Sb * Sa_b**2) / ((Sa * Sb * Sa_b) ** 2 + (Sa**2 - Sb**2) ** 2)
+        F_scale = (pSaSb * Sa * Sb * Sa_b**2) / (
+            (Sa * Sb * Sa_b) ** 2 + (Sa**2 - Sb**2) ** 2
         )
-        force_on_one_element = pressure * np.pi * radius**2 * F_scale / n_elems
+        force_on_one_element = (
+            pressure * scale_linear * np.pi * radius**2 * F_scale / n_elems
+        )
 
         # Compute moment
         M_scale = -(pSaSb * Sa_b * (Sa**2 - Sb**2)) / (
             (Sa * Sb * Sa_b) ** 2 + (Sa**2 - Sb**2) ** 2
         )
-        torque_on_one_element = pressure * np.pi * radius**3 * M_scale / n_elems
+        torque_on_one_element = pressure * scale * np.pi * radius**3 * M_scale / n_elems
+
+        # if np.isnan(F_scale).any() or np.isnan(M_scale).any():
+        #    breakpoint()
 
         # Add on angular actuation
-        for i in range(skip_element_pre, n_elems - skip_element_post - 1):
-            rod_external_torques[2, i] -= torque_on_one_element[i + 1]
-        for i in range(skip_element_pre + 1, n_elems - skip_element_post):
-            rod_external_torques[2, i] += torque_on_one_element[i - 1]
+        rod_external_torques[2, 1] += 0.5 * torque_on_one_element[0]
+        rod_external_torques[2, -2] -= 0.5 * torque_on_one_element[-1]
+        for i in range(1, n_elems - 1):
+            # rod_external_torques[2, i] += torque_on_one_element[i]  # Uniform
+            v = 0.5 * torque_on_one_element[i]
+            rod_external_torques[2, i - 1] -= v
+            rod_external_torques[2, i + 1] += v
 
         # Add on linear actuation
-        rod_external_forces[..., skip_element_pre] -= (
-            force_on_one_element[skip_element_pre] * tangents[..., skip_element_pre]
-        )
-        rod_external_forces[..., n_elems - skip_element_post] += (
-            force_on_one_element[n_elems - skip_element_post - 1]
-            * tangents[..., n_elems - skip_element_post - 1]
-        )
-        for i in range(skip_element_pre + 1, n_elems - skip_element_post):
-            rod_external_forces[..., i] += (
-                force_on_one_element[i - 1] * tangents[..., i - 1]
-            )
-            rod_external_forces[..., i] -= force_on_one_element[i] * tangents[..., i]
+        for i in range(n_elems):
+            v = force_on_one_element[i] * tangents[..., i]
+            rod_external_forces[..., i] -= v
+            rod_external_forces[..., i + 1] += v
 
-        # for i in range(skip_element_pre, n_elems - skip_element_post):
+        # for i in range(0, n_elems):
         #     rod_external_forces[..., i] += (
         #         force_on_one_element[i] * tangents[..., i]
         #     ) * 0.5

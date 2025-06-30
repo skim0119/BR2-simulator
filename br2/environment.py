@@ -227,7 +227,10 @@ class Environment:
 
         """rod name -> [seg,rod]"""
         self.shearable_rods = self.assy.build(
-            rod_database_path, assembly_config_path, verbose=verbose
+            rod_database_path,
+            assembly_config_path,
+            debug_step_every=self.step_skip if plot_states_online else None,
+            verbose=verbose,
         )
         self.simulator = self.assy.simulator
 
@@ -504,27 +507,25 @@ class Environment:
             filename = f"br2_data_{tag}.npz"
         path = os.path.join(self.paths.data, filename)
 
-        positions = []
+        positions = {}
         for key in self.data_rods:
             rod = self.data_rods[key]
             time = np.array(rod["time"])
             position = np.array(rod["position"])
             position = 0.5 * (position[..., 1:] + position[..., :-1])
-            positions.append(position)
-        positions = np.asarray(positions)
+            positions[f"position_{key}"] = position
 
-        directors = []
+        directors = {}
         for key in self.data_rods:
             rod = self.data_rods[key]
             director = np.array(rod["director"])
-            directors.append(director)
-        directors = np.asarray(directors)
+            directors[f"director_{key}"] = director
 
         np.savez(
             path,
             time=time,
-            positions=positions,
-            directors=directors,
+            **positions,
+            **directors,
         )
 
     def debug_data(self):

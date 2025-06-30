@@ -6,8 +6,15 @@ from elastica.typing import RodType
 
 
 class FreeCallback(CallBackBaseClass):
-    def __init__(self, step_skip: int, callback_params: dict, time_interval=None, actuation_ref=None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(
+        self,
+        step_skip: int,
+        callback_params: dict,
+        time_interval=None,
+        actuation_ref=None,
+        **kwargs,
+    ):
+        # super().__init__(**kwargs)
         self.every = step_skip
         self.time_interval = time_interval
         self.callback_params = callback_params
@@ -53,8 +60,17 @@ class FreeCallback(CallBackBaseClass):
 
 
 class OnlinePlottingRodStatus(CallBackBaseClass):
-    def __init__(self, step_skip: int, callback_params: dict, time_interval=None, actuation_ref=None, **kwargs):
-        CallBackBaseClass.__init__(self)
+    def __init__(
+        self,
+        step_skip: int,
+        callback_params: dict,
+        time_interval=None,
+        actuation_ref=None,
+        name: str | None = None,
+        **kwargs,
+    ):
+        # CallBackBaseClass.__init__(self)  # Technically, this is not needed.
+        self.name = name
         self.every = step_skip
         self.time_interval = time_interval
         self.callback_params = callback_params
@@ -99,7 +115,7 @@ class OnlinePlottingRodStatus(CallBackBaseClass):
             return
         fig, axes = self.fig, self.axes
 
-        fig.suptitle(f"Time: {time:.2f}, Step: {current_step}")
+        fig.suptitle(f"Rod: {self.name}, Time: {time:.2f}, Step: {current_step}")
 
         self.plot_vector(system.position_collection, self.plot_position)
         self.plot_SO3(system.director_collection, self.plot_director)

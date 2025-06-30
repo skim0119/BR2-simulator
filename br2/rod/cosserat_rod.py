@@ -56,6 +56,7 @@ def _compute_sigma_kappa_for_blockstructure(memory_block) -> None:
         memory_block.initial_beta_angle,
         memory_block.initial_radius,
         memory_block.delta_turn,
+        memory_block.ghost_elems_idx,
     )
 
     # Compute bending twist strains for the block
@@ -256,6 +257,7 @@ class FreeCosseratRod(RodBase, KnotTheory):
             self.initial_beta_angle,
             self.initial_radius,
             self.delta_turn,
+            self.ghost_elems_idx,
         )
 
         # Compute bending twist strains
@@ -579,7 +581,12 @@ class FreeCosseratRod(RodBase, KnotTheory):
 
 
 @numba.njit(cache=True)
-def _compute_geometry_from_state(position_collection, volume, lengths, tangents):
+def _compute_geometry_from_state(
+    position_collection,
+    volume,
+    lengths,
+    tangents,
+):
     """
     Update <length, tangents, and radius> given <position and volume>.
     """
@@ -622,6 +629,7 @@ def _compute_all_dilatations(
     initial_beta_angle,
     initial_radius,
     delta_turn,
+    ghost_elems_idx,
 ):
     """
     Update <dilatation and voronoi_dilatation>
@@ -629,7 +637,11 @@ def _compute_all_dilatations(
     # _, local_twist = _compute_twist(
     #    position_collection[None, ...], director_collection[0][None, ...]
     # )
+    delta_turn[0] = 0
     for k in range(1, lengths.shape[0]):  # start from 1: first element is always 0
+        delta_turn[k] = 0
+        if k in ghost_elems_idx or k - 1 in ghost_elems_idx:
+            continue
         R_diff = np.dot(
             director_collection[:, :, k - 1], director_collection[:, :, k].T
         )
@@ -637,16 +649,62 @@ def _compute_all_dilatations(
         angle = np.arccos((trace_value - 1) / 2.0 - 1e-10)
         signed_angle = (angle / (2 * np.sin(angle))) * (R_diff[1, 0] - R_diff[0, 1])
 
-        delta_turn[k] = signed_angle
-        # delta_turn[k] = angle
-        # delta_turn[k] = 0
+        delta_turn[k - 1] += 0.5 * signed_angle
+        delta_turn[k] += 0.5 * signed_angle
+        if k + 1 in ghost_elems_idx:
+            delta_turn[k] *= 2
+        if k - 2 in ghost_elems_idx:
+            delta_turn[k - 1] *= 2
+    delta_turn[0] *= 2
+    delta_turn[-1] *= 2
     # print(delta_turn)
+    # breakpoint()
 
-    _compute_geometry_from_state(position_collection, volume, lengths, tangents)
+    _compute_geometry_from_state(
+        position_collection,
+        volume,
+        lengths,
+        tangents,
+    )
     # Caveat : Needs already set rest_lengths and rest voronoi domain lengths
     # Put in initialization
     for k in range(lengths.shape[0]):
+        # Alias to lambda_1
         dilatation[k] = lengths[k] / rest_lengths[k]
+
+        # radius
+        lambda_2 = radius[k] / initial_radius[k]
+        # lambda_2_alpha = np.sqrt(
+        #     max(0, 1 - (dilatation[k] * np.cos(alpha_angle[k])) ** 2)
+        # ) / (
+        #     np.sin(alpha_angle[k])
+        #     * (
+        #         1
+        #         + (
+        #             delta_turn[k]
+        #             * initial_radius[k]
+        #             / (lengths[k] * np.tan(initial_alpha_angle[k]) + 1e-10)
+        #         )
+        #     )
+        #     + 1e-10
+        # )
+        # lambda_2_beta = np.sqrt(
+        #     max(0, 1 - (dilatation[k] * np.cos(beta_angle[k])) ** 2)
+        # ) / (
+        #     np.sin(-beta_angle[k])
+        #     * (
+        #         1
+        #         + (
+        #             delta_turn[k]
+        #             * initial_radius[k]
+        #             / (lengths[k] * np.tan(-initial_beta_angle[k]) + 1e-10)
+        #         )
+        #     )
+        #     + 1e-10
+        # )
+        # lambda_2 = max(lambda_2_alpha, lambda_2_beta)
+        # lambda_2 = max(min(lambda_2, 1.5), 0.5)  # Stability for ghost nodes
+        # radius[k] = lambda_2 * initial_radius[k]
 
         # G. Krishnan 2015 (14)-(15)
         # sgn_beta = np.sign(beta_angle[k])
@@ -669,9 +727,6 @@ def _compute_all_dilatations(
         #     / (np.sin(alpha - beta) + 1e-10),
         #     0.5,
         # )
-        lambda_2 = radius[k] / initial_radius[k]
-        # radius[k] = lambda_2 * initial_radius[k]
-        # radius[k] = initial_radius[k]  # Constant radius
 
         # delta_turn[k] = (
         #     (rest_lengths[k] / (initial_radius[k] + 1e-10))
@@ -773,6 +828,7 @@ def _compute_shear_stretch_strains(
     initial_beta_angle,
     initial_radius,
     delta_turn,
+    ghost_elems_idx,
 ):
     """
     Update <shear/stretch(sigma)> given <dilatation, director, and tangent>.
@@ -796,6 +852,7 @@ def _compute_shear_stretch_strains(
         initial_beta_angle,
         initial_radius,
         delta_turn,
+        ghost_elems_idx,
     )
 
     z_vector = np.array([0.0, 0.0, 1.0]).reshape(3, -1)
@@ -824,6 +881,7 @@ def _compute_internal_shear_stretch_stresses_from_model(
     initial_beta_angle,
     initial_radius,
     delta_turn,
+    ghost_elems_idx,
 ):
     """
     Update <internal stress> given <shear matrix, sigma, and rest_sigma>.
@@ -850,6 +908,7 @@ def _compute_internal_shear_stretch_stresses_from_model(
         initial_beta_angle,
         initial_radius,
         delta_turn,
+        ghost_elems_idx,
     )
     internal_stress[:] = _batch_matvec(shear_matrix, sigma - rest_sigma)
 
@@ -948,6 +1007,7 @@ def _compute_internal_forces(
         initial_beta_angle,
         initial_radius,
         delta_turn,
+        ghost_elems_idx,
     )
 
     # Signifies Q^T n_L / e
