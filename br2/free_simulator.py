@@ -384,7 +384,7 @@ class FreeAssembly:
                 self.simulator.add_forcing_to(rod).using(
                     FreeBendActuation,
                     actuation_ref,
-                    z_angle=gamma * np.pi / 180.0,
+                    z_angle=gamma * np.pi / 180.0,  # To rad
                     scale=scale,
                     gamma_tilt=gamma_tilt,
                     ramp_up_time=ramp_up_time,
