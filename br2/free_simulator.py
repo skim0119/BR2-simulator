@@ -358,6 +358,15 @@ class FreeAssembly:
                 GravityForces,
                 acc_gravity=np.array([0.0, 0.0, -9.80665]),  # Reverse direction
             )
+            if "tip_weight" in rod_spec:
+                from br2.free_custom_systems import TipLoad
+                tip_weight = rod_spec["tip_weight"]
+                self.simulator.add_forcing_to(rod).using(
+                    TipLoad,
+                    start_force=np.zeros(3),
+                    end_force=np.array([0., 0., -1.]) * tip_weight,
+                    ramp_up_time=1.0,
+                )
 
         return rod
 
