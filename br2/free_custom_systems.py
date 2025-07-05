@@ -21,12 +21,12 @@ import matplotlib.pyplot as plt
 
 
 class TipLoad(EndpointForces):
-    def __init__(self, time_interval, **kwargs):
+    def __init__(self, time_interval=None, **kwargs):
         self.time_interval = time_interval
         super().__init__(**kwargs)
 
     def apply_forces(self, system, time):
-        if self.time_interval[0] < time < self.time_interval[1]:
+        if self.time_interval is None or (self.time_interval[0] < time < self.time_interval[1]):
             super().apply_forces(system, time)
 
 
