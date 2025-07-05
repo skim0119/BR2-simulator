@@ -51,7 +51,10 @@ class FreeCallback(CallBackBaseClass):
         )
         # self.callback_params["vcom"].append(system.compute_velocity_center_of_mass())
 
-        self.callback_params["actuation"].append(self.actuation_ref())
+        if self.actuation_ref is not None:
+            self.callback_params["actuation"].append(self.actuation_ref())
+        else:
+            self.callback_params["actuation"].append(0.0)
 
         self.callback_params["volume"].append(system.volume.copy())
         self.callback_params["alpha_angle"].append(system.alpha_angle.copy())
