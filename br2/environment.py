@@ -148,6 +148,10 @@ class Environment:
     capture_interval : Optional[tuple[float, float]]
         Interval for capturing the data. (default=None)
         ex. (0.3, 0.5)
+
+    Notes
+    -----
+      Since the keyframe can be stretch, not necessarily need 25 fps to achieve smooth behavior
     """
 
     def __init__(
@@ -182,7 +186,7 @@ class Environment:
             import bsr
 
             bsr.clear_mesh_objects()
-            bsr.set_view_distance(0.8)
+            # bsr.set_view_distance(0.8)
 
         # Rod
         self.shearable_rods = {}
@@ -205,7 +209,7 @@ class Environment:
         plot_states_online: bool = False,
         verbose: bool = True,
         custom_callbacks: list[Callable] | None = None,
-        restart_save_path=None,
+        restart_load_path=None,
         **kwargs,
     ) -> None:
         """
@@ -262,8 +266,8 @@ class Environment:
         # Finalize simulation environment. After finalize, you cannot add
         # any forcing, constrain or call back functions
         self.simulator.finalize()
-        if restart_save_path is not None:
-            self.load_state(directory=restart_save_path, verbose=verboase)
+        if restart_load_path is not None:
+            self.load_state(directory=restart_load_path)
         self.time = start_time  # simulation time
 
     def run(

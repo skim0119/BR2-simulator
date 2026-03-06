@@ -75,6 +75,7 @@ class BlenderRodCallback(CallBackBaseClass):
         ):
             self.stop = True
             return
+
         if hasattr(system, "alpha_angle") and (
             np.isnan(system.alpha_angle).any() or np.isnan(system.beta_angle).any()
         ):
@@ -178,6 +179,7 @@ class BlenderRodCallback(CallBackBaseClass):
             positions=positions * self.scale,
             radii=system.radius * self.scale,
             # directors=system.director_collection,
+            downsample_num_element=10,
         )
 
         self.bsr_splines_alpha = []

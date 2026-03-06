@@ -132,11 +132,14 @@ class LaplaceDissipationFilterV2(DamperBase):
         )
 
         # Filter SO3 rotation matrices (not working)
-        # nb_filter_rate_so3(
-        #    rod.director_collection,
-        #    self.director_filter_term,
-        #    self.filter_order,
-        # )
+        if np.any(np.isnan(rod.director_collection)):
+            pass
+        else:
+            nb_filter_rate_so3(
+               rod.director_collection,
+               self.director_filter_term,
+               self.filter_order,
+            )
 
 
 @njit(cache=True)

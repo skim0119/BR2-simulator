@@ -118,7 +118,7 @@ class FreeBendActuation(NoForces):
         # Angular actuation
         ff = 15
         fi = 15
-        for i in range(skip_element_pre, n_elems - skip_element_post - 1):
+        for i in np.arange(skip_element_pre, n_elems - skip_element_post - 1):
             _gamma_tilt_z = gamma_tilt * min(1.0, (-i + 60) / fi, i / ff)
             moment_arm = np.array(
                 [
@@ -143,7 +143,7 @@ class FreeBendActuation(NoForces):
                 * moment_arm[2]
                 * _some_scale_linear_actuation_to_moment
             )
-        for i in range(skip_element_pre + 1, n_elems - skip_element_post):
+        for i in np.arange(skip_element_pre + 1, n_elems - skip_element_post):
             _gamma_tilt_z = gamma_tilt * min(1.0, (-i + 60) / fi, i / ff)
             moment_arm = np.array(
                 [
@@ -178,7 +178,7 @@ class FreeBendActuation(NoForces):
             _force_on_one_element[n_elems - skip_element_post - 1]
             * tangents[..., n_elems - skip_element_post - 1]
         )
-        for i in range(skip_element_pre + 1, n_elems - skip_element_post):
+        for i in np.arange(skip_element_pre + 1, n_elems - skip_element_post):
             rod_external_forces[..., i] += (
                 _force_on_one_element[i - 1] * tangents[..., i - 1]
             )
@@ -373,8 +373,8 @@ class FreeCombinedActuation(NoForces):
         pressure = self.actuation_ref() * factor
         if math.isclose(pressure, 0.0):
             # This is to save some unnecessary activation with small pressure
-            a = np.zeros(system.n_elems, dtype=np.float_)
-            b = np.zeros(system.n_elems, dtype=np.float_)
+            a = np.zeros(system.n_elems, dtype=np.float64)
+            b = np.zeros(system.n_elems, dtype=np.float64)
         else:
             a, b = self.nb_apply_forces_and_torques(
                 rod_external_forces=system.external_forces,
@@ -458,19 +458,19 @@ class FreeCombinedActuation(NoForces):
         # Add on angular actuation
         rod_external_torques[2, 1] += 0.5 * torque_on_one_element[0]
         rod_external_torques[2, -2] -= 0.5 * torque_on_one_element[-1]
-        for i in range(1, n_elems - 1):
+        for i in np.arange(1, n_elems - 1):
             # rod_external_torques[2, i] += torque_on_one_element[i]  # Uniform
             v = 0.5 * torque_on_one_element[i]
             rod_external_torques[2, i - 1] -= v
             rod_external_torques[2, i + 1] += v
 
         # Add on linear actuation
-        for i in range(n_elems):
+        for i in np.arange(n_elems):
             v = force_on_one_element[i] * tangents[..., i]
             rod_external_forces[..., i] -= v
             rod_external_forces[..., i + 1] += v
 
-        # for i in range(0, n_elems):
+        # for i in np.arange(0, n_elems):
         #     rod_external_forces[..., i] += (
         #         force_on_one_element[i] * tangents[..., i]
         #     ) * 0.5
