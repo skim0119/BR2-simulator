@@ -1,18 +1,35 @@
 __all__ = ["BlenderRodCallback"]
 
-import bpy
 import numpy as np
 from matplotlib import cm
 from matplotlib import colors
 from elastica import CallBackBaseClass
 from elastica.typing import RodType
 
-from bsr import frame_manager
-from bsr import BezierSplinePipe
+try:
+    import bpy
+    from bsr import frame_manager
+    from bsr import BezierSplinePipe
 
-# from bsr import RodWithCylinder as Rod
-# from bsr import RodWithBox as Rod  # Need to pass director
-from bsr import BezierSplinePipe as Rod
+    # from bsr import RodWithCylinder as Rod
+    # from bsr import RodWithBox as Rod  # Need to pass director
+    from bsr import BezierSplinePipe as Rod
+except ImportError:
+    import warnings
+
+    warnings.warn(
+        "Could not import blender modules (bpy, bsr). "
+        "Blender-related functionalities will be skipped."
+    )
+
+    class BlenderRodCallback(CallBackBaseClass):
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def make_callback(
+            self, system: RodType, time: np.floating, current_step: int
+        ) -> None:
+            pass
 
 
 ZOFFSET = 0.35
