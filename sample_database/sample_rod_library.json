@@ -1,4 +1,4 @@
-{ 
+{
     "Info": "Example set of BR2 properties",
     "DefaultParams": {
         "n_elements"       : 41,
@@ -18,7 +18,7 @@
             "Info"  : "Simple bend rod for test",
             "alpha" : 80,
             "beta" : -80,
-            "gamma" : [0],
+            "gamma" : 0,
             "hollow" : true
         },
         "RodRightTwist": {

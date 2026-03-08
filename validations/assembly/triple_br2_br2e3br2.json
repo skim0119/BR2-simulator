@@ -1,4 +1,4 @@
-{ 
+{
     "CaseID": 1,
     "Date": "2021-10-11",
     "Info": "Triple Segment br2-e3-br2 arangement",
@@ -47,8 +47,5 @@
             ["seg2", 2]
             ["seg3", 2]
         ]
-    },
-    "Misc": {
-        "Gravity": "Off"
     }
 }

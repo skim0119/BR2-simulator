@@ -15,7 +15,6 @@ from br2.rod.cosserat_rod import FreeCosseratRod
 
 
 class BaseSystemCollection(ea.BaseSystemCollection):
-
     def finalize(self):
         """
         This method finalizes the simulator class. When it is called, it is assumed that the user has appended

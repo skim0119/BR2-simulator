@@ -20,7 +20,7 @@ It is recommended to use the angle above 60 degrees, because the current actuati
 To simulate the bending, apply `gamma` angle (in degrees) which is the cosine angle of the direction of bending moment.
 
 ```json
-{ 
+{
     "Info": "Example rod properties",
     "DefaultParams": {
         "n_elements"     : 41,
@@ -53,7 +53,7 @@ To simulate the bending, apply `gamma` angle (in degrees) which is the cosine an
 The position is defined in z-x coordinate which locates the base of the rod.
 
 ```json
-{ 
+{
     "CaseID": 1,
     "Date": "2021-10-11",
     "Info": "Single-segment BR2 Assembly",
@@ -77,9 +77,6 @@ The position is defined in z-x coordinate which locates the base of the rod.
         "action3": [
             ["seg1", "RodLeftTwist"]
         ]
-    },
-    "Misc": {
-        "Gravity": "Off"
     }
 }
 ```

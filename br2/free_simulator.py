@@ -53,7 +53,15 @@ class BR2Simulator(
 
 
 class FreeAssembly:
-    def __init__(self, env, REMOVE_CONNECTION: bool = False, **kwargs):
+    def __init__(
+        self,
+        env,
+        REMOVE_BC: bool = False,
+        REMOVE_GRAVITY: bool = True,
+        REMOVE_DISSIPATION: bool = False,
+        REMOVE_CONNECTION: bool = False,
+        **kwargs,
+    ):
         self.env = env
 
         self.simulator = BR2Simulator()
@@ -80,6 +88,9 @@ class FreeAssembly:
         # )
 
         # DEBUG_CONFIGURATION
+        self.REMOVE_BC = REMOVE_BC
+        self.REMOVE_GRAVITY = REMOVE_GRAVITY
+        self.REMOVE_DISSIPATION = REMOVE_DISSIPATION
         self.REMOVE_CONNECTION = REMOVE_CONNECTION
 
     def save_state(self, **kwargs):
@@ -123,7 +134,6 @@ class FreeAssembly:
             connect_spec = json.load(json_data_file)
             segments = connect_spec["Segments"]
             activations = connect_spec["Activations"]
-            self.toggle_gravity = connect_spec["Misc"]["Gravity"]
         self.num_activation += len(activations)
 
         # create segment
@@ -132,7 +142,6 @@ class FreeAssembly:
         prev_seg_rods = None
         frees = {}
         for seg_idx, seg_name in enumerate(segments):  # create segment rods
-
             # create rods
             seg = segments[seg_name]
             seg_rods = []
@@ -192,12 +201,12 @@ class FreeAssembly:
 
                 frees[rod_name] = rod
                 seg_rods.append(rod_name)
-            assert seg_lengths.count(seg_lengths[0]) == len(
-                seg_lengths
-            ), "rods' lengths should all be the same within a segment"
-            assert seg_n_elements.count(seg_n_elements[0]) == len(
-                seg_n_elements
-            ), "rods' number of elements should all be the same within a segment"
+            assert seg_lengths.count(seg_lengths[0]) == len(seg_lengths), (
+                "rods' lengths should all be the same within a segment"
+            )
+            assert seg_n_elements.count(seg_n_elements[0]) == len(seg_n_elements), (
+                "rods' number of elements should all be the same within a segment"
+            )
             start_y_position += seg_lengths[0]
 
             """Parallel Connection"""
@@ -325,7 +334,7 @@ class FreeAssembly:
             )
 
         # add damping
-        if "damping_constant" in rod_spec:
+        if not self.REMOVE_DISSIPATION and "damping_constant" in rod_spec:
             damping_constant = rod_spec["damping_constant"]
             rot_damping_constant = rod_spec.get(
                 "rot_damping_constant", damping_constant * 5 * 2
@@ -342,7 +351,7 @@ class FreeAssembly:
             )
 
         # Constrain one end of the rod (TODO : Modify for serial connection)
-        if is_first_segment:
+        if not self.REMOVE_BC and is_first_segment:
             self.simulator.constrain(rod).using(
                 FreeBaseEndSoftFixed,
                 constrained_position_idx=(0,),  # (0, 1, 2),
@@ -353,18 +362,19 @@ class FreeAssembly:
             )
 
         # Gravity
-        if self.toggle_gravity:
+        if not self.REMOVE_GRAVITY:
             self.simulator.add_forcing_to(rod).using(
                 GravityForces,
                 acc_gravity=np.array([0.0, 0.0, -9.80665]),  # Reverse direction
             )
             if "tip_weight" in rod_spec:
                 from br2.free_custom_systems import TipLoad
+
                 tip_weight = rod_spec["tip_weight"]
                 self.simulator.add_forcing_to(rod).using(
                     TipLoad,
                     start_force=np.zeros(3),
-                    end_force=np.array([0., 0., -1.]) * tip_weight,
+                    end_force=np.array([0.0, 0.0, -1.0]) * tip_weight,
                     ramp_up_time=1.0,
                 )
 

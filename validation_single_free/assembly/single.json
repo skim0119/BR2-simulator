@@ -15,8 +15,5 @@
         "action": [
             ["seg", 0]
         ]
-    },
-    "Misc": {
-        "Gravity": true
     }
 }

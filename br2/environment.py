@@ -223,9 +223,9 @@ class Environment:
         """
 
         assert os.path.exists(rod_database_path), "Rod database path does not exists."
-        assert os.path.exists(
-            assembly_config_path
-        ), "Assembly configuration does not exists."
+        assert os.path.exists(assembly_config_path), (
+            "Assembly configuration does not exists."
+        )
 
         self.assy = FreeAssembly(self, **kwargs)
 
@@ -329,6 +329,7 @@ class Environment:
             )
         else:
             _pbar = pbar
+
         while time < self.time + duration:
             time = self.StatefulStepper.step(
                 self.simulator,
@@ -506,7 +507,7 @@ class Environment:
             String tag that appends to the file name.
         """
         if not tag:
-            filename = f"br2_data.npz"
+            filename = "br2_data.npz"
         else:
             filename = f"br2_data_{tag}.npz"
         path = os.path.join(self.paths.data, filename)
@@ -726,9 +727,9 @@ class BatchEnvironment:
         """
 
         assert os.path.exists(rod_database_path), "Rod database path does not exists."
-        assert os.path.exists(
-            assembly_config_path
-        ), "Assembly configuration does not exists."
+        assert os.path.exists(assembly_config_path), (
+            "Assembly configuration does not exists."
+        )
 
         # Set action
         action_name = {f"{prepend_tag}_{key}": value for key, value in action.items()}

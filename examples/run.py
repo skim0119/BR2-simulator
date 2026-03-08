@@ -29,7 +29,6 @@ def main():
     env.reset(
         rod_database_path="sample_database/sample_rod_library.json",
         assembly_config_path="sample_assembly/single_br2_v1.json",
-        gravity=True
     )
 
     # Simulation
