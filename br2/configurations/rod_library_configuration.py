@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 class RodConfig(BaseModel):
     model_config = ConfigDict(strict=False)
 
-    Info: str
+    Info: str = ""
 
     n_elements: int
     direction: list[float]
@@ -19,8 +19,9 @@ class RodConfig(BaseModel):
     damping_constant: float
     youngs_modulus: float
     shear_modulus: float
-    alpha: float
-    beta: float
+    alpha: float = 0.0
+    beta: float = 0.0
+    gamma: float | None = None
 
 
 class RodLibrary(BaseModel):

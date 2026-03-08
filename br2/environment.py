@@ -4,6 +4,7 @@ import os
 import copy
 import time
 import logging
+import warnings
 
 from dataclasses import dataclass
 from itertools import chain
@@ -23,6 +24,7 @@ from br2.free_simulator import FreeAssembly
 from br2.callbacks import BlenderRodCallback
 from br2.callbacks import OnlinePlottingRodStatus
 from br2.constants import psi2Nm2
+from br2.configurations import RodLibrary, AssemblyConfig
 
 
 @dataclass
@@ -213,6 +215,8 @@ class Environment:
         **kwargs,
     ) -> None:
         """
+        Deprecated. Use `configure` with schema objects instead.
+
         Creates the simulation environment.
 
         Parameters
@@ -221,18 +225,76 @@ class Environment:
         assembly_config_path : str
         start_time : float
         """
+        warnings.warn(
+            "Environment.reset(...) is deprecated and will be removed in a future "
+            "release. Use Environment.configure(...) with RodLibrary and "
+            "AssemblyConfig instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         assert os.path.exists(rod_database_path), "Rod database path does not exists."
         assert os.path.exists(assembly_config_path), (
             "Assembly configuration does not exists."
         )
 
+        self._configure_impl(
+            rod_database_source=rod_database_path,
+            assembly_config_source=assembly_config_path,
+            start_time=start_time,
+            plot_states_online=plot_states_online,
+            verbose=verbose,
+            custom_callbacks=custom_callbacks,
+            restart_load_path=restart_load_path,
+            **kwargs,
+        )
+
+    def configure(
+        self,
+        rod_library: RodLibrary,
+        assembly_config: AssemblyConfig,
+        start_time: float = 0.0,
+        plot_states_online: bool = False,
+        verbose: bool = True,
+        custom_callbacks: list[Callable] | None = None,
+        restart_load_path=None,
+        **kwargs,
+    ) -> None:
+        """
+        Creates the simulation environment from validated configuration schemas.
+        """
+        self._configure_impl(
+            rod_database_source=rod_library.model_dump(by_alias=True, exclude_none=True),
+            assembly_config_source=assembly_config.model_dump(
+                by_alias=True, exclude_none=True
+            ),
+            start_time=start_time,
+            plot_states_online=plot_states_online,
+            verbose=verbose,
+            custom_callbacks=custom_callbacks,
+            restart_load_path=restart_load_path,
+            **kwargs,
+        )
+
+    def _configure_impl(
+        self,
+        rod_database_source: str | dict,
+        assembly_config_source: str | dict,
+        start_time: float = 0.0,
+        plot_states_online: bool = False,
+        verbose: bool = True,
+        custom_callbacks: list[Callable] | None = None,
+        restart_load_path=None,
+        **kwargs,
+    ) -> None:
+        """Shared implementation for `reset` and `configure`."""
+
         self.assy = FreeAssembly(self, **kwargs)
 
         """rod name -> [seg,rod]"""
         self.shearable_rods = self.assy.build(
-            rod_database_path,
-            assembly_config_path,
+            rod_database_source,
+            assembly_config_source,
             debug_step_every=self.step_skip if plot_states_online else None,
             verbose=verbose,
         )

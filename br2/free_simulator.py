@@ -115,8 +115,11 @@ class FreeAssembly:
         """
 
         # import rod configuration
-        with open(rod_info, "r") as json_data_file:
-            rod_config = json.load(json_data_file)
+        if isinstance(rod_info, (str, os.PathLike)):
+            with open(rod_info, "r") as json_data_file:
+                rod_config = json.load(json_data_file)
+        else:
+            rod_config = copy.deepcopy(rod_info)
         rod_specs = rod_config["Rods"]
         default_rod_spec = rod_config["DefaultParams"]
         for k in rod_specs.keys():  # Update default parameter if doesn't existe
@@ -130,10 +133,13 @@ class FreeAssembly:
             )
 
         # import segments and activations. construct rod_name
-        with open(connect_info) as json_data_file:
-            connect_spec = json.load(json_data_file)
-            segments = connect_spec["Segments"]
-            activations = connect_spec["Activations"]
+        if isinstance(connect_info, (str, os.PathLike)):
+            with open(connect_info) as json_data_file:
+                connect_spec = json.load(json_data_file)
+        else:
+            connect_spec = copy.deepcopy(connect_info)
+        segments = connect_spec["Segments"]
+        activations = connect_spec["Activations"]
         self.num_activation += len(activations)
 
         # create segment
