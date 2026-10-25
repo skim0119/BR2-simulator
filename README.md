@@ -16,6 +16,22 @@ Simulator development for BR2 Softrobot using [`PyElastica`](https://github.com/
 
 The [documentation](https://br2-simulator.readthedocs.io/en/latest/?badge=latest) includes the detail guide of how to use this package.
 
+## Development
+
+Python 3.11 and [uv](https://docs.astral.sh/uv/) are required. Pillow 13's
+security fixes require Python 3.11; Python 3.8–3.10 are no longer supported.
+
+```sh
+uv sync --locked
+```
+
+Install documentation dependencies and build locally with:
+
+```sh
+uv sync --locked --group docs
+uv run sphinx-build -b html docs docs/_build/html
+```
+
 ## Configuration
 
 The Sample rod-database is included in [`sample_database`](https://github.com/skim0119/BR2-simulator/tree/main/sample_database) and the sample assembly is included in [`sample_assembly`](https://github.com/skim0119/BR2-simulator/tree/main/sample_assembly).
