@@ -1,36 +1,32 @@
-[tool.poetry]
+[project]
 name = "br2"
 version = "0.1.1"
 description = "Cosserat Rod based FREE assembly simulator"
-authors = ["Seung Hyun Kim <skim0119@gmail.com>"]
+authors = [{name = "Seung Hyun Kim", email = "skim0119@gmail.com"}]
 license = "MIT"
 readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "pyelastica>=0.3.1,<0.4",
+    "tqdm>=4.65.0,<5",
+    "matplotlib>=3.7.1,<4",
+    "pillow>=13.0.0",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.8,<3.11"
-pyelastica = ">=0.3.1"
-tqdm = "^4.65.0"
-matplotlib = "^3.7.1"
+[dependency-groups]
+dev = ["pytest>=9.0.3,<10", "pytest-mock>=3.10.0,<4"]
+docs = [
+    "sphinx",
+    "sphinx-book-theme>=1.0.1,<2",
+    "numpydoc>=1.5.0,<2",
+    "myst-nb>=0.17.2,<0.18",
+    "sphinx-autodoc-typehints>=1.23.0,<2",
+    "readthedocs-sphinx-search>=0.3.1,<0.4",
+]
 
-[tool.poetry.group.dev]
-optional = true
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.3.1"
-pytest-mock = "^3.10.0"
-
-
-[tool.poetry.group.docs]
-optional = true
-
-[tool.poetry.group.docs.dependencies]
-sphinx = "*"
-sphinx-book-theme = "^1.0.1"
-numpydoc = "^1.5.0"
-myst-nb = "^0.17.2"
-sphinx-autodoc-typehints = "^1.23.0"
-readthedocs-sphinx-search = "^0.3.1"
+[tool.uv]
+constraint-dependencies = ["certifi>=2026.10.19", "setuptools>=84.1.0"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
